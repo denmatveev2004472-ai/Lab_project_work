@@ -2,7 +2,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
 
-const API_BASE = import.meta.env.DEV ? 'http://192.168.1.120:8000' : window.location.origin
+const API_BASE = import.meta.env.DEV ? 'http://192.168.3.56:8000' : window.location.origin
 
 async function api(url, options) {
   const r = await fetch(`${API_BASE}${url}`, options)
@@ -189,6 +189,7 @@ const i18n = {
     bookingExpRequired: 'Укажите эксперимент',
     bookingDateRequired: 'Выберите дату',
     selectInstrument: 'Выберите прибор',
+    selectRoom: 'Выберите комнату',
     instrFTIR: 'ИК-спектроскопия (FTIR)',
     instrTGA: 'Термогравиметрия (TGA)',
     instrDLS: 'Динамическое светорассеяние (DLS)',
@@ -202,7 +203,15 @@ const i18n = {
     dur90: '1,5 часа',
     dur120: '2 часа',
     dur180: '3 часа',
-    dur240: '4+ часа',
+    dur240: '4 часа',
+    dur300: '5 часов',
+    dur360: '6 часов',
+    dur420: '7 часов',
+    dur480: '8 часов',
+    dur540: '9 часов',
+    dur600: '10 часов',
+    dur660: '11 часов',
+    dur720: '12 часов',
     adminPanel: 'Панель администратора',
     bookingMaintAlert: 'находится на техническом обслуживании',
     maintSelectDates: 'Выберите даты техобслуживания (нажмите для выбора/снятия)',
@@ -370,6 +379,7 @@ const i18n = {
     bookingExpRequired: 'Enter experiment description',
     bookingDateRequired: 'Select a date',
     selectInstrument: 'Select instrument',
+    selectRoom: 'Select room',
     instrFTIR: 'IR Spectroscopy (FTIR)',
     instrTGA: 'Thermogravimetry (TGA)',
     instrDLS: 'Dynamic Light Scattering (DLS)',
@@ -383,7 +393,15 @@ const i18n = {
     dur90: '1.5 hours',
     dur120: '2 hours',
     dur180: '3 hours',
-    dur240: '4+ hours',
+    dur240: '4 hours',
+    dur300: '5 hours',
+    dur360: '6 hours',
+    dur420: '7 hours',
+    dur480: '8 hours',
+    dur540: '9 hours',
+    dur600: '10 hours',
+    dur660: '11 hours',
+    dur720: '12 hours',
     adminPanel: 'Admin panel',
     bookingMaintAlert: 'is under maintenance',
     maintSelectDates: 'Select maintenance dates (click to toggle)',
@@ -771,6 +789,37 @@ async function submitAddForm() {
   } catch (e) { addError.value = `${t('saveErrorPrefix')}: ${String(e.message || e)}` }
   finally { addSaving.value = false }
 }
+const expandedNames = ref(new Set())
+function toggleNameExpand(id) {
+  const next = new Set(expandedNames.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedNames.value = next
+}
+function isLongName(row) {
+  const name = row.name || row.name_ru || row.name_en || ''
+  return name.length > 28
+}
+function stockLevel(row) {
+  const q = parseFloat(row.quantity)
+  if (!Number.isFinite(q)) return 'normal'
+  if (q <= 0) return 'empty'
+  if (q <= 2) return 'low'
+  return 'normal'
+}
+async function changeQuantity(row, delta) {
+  const current = parseFloat(row.quantity) || 0
+  const next = Math.max(0, current + delta)
+  try {
+    await api(`/api/item/${row.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity: String(next) })
+    })
+    const idx = items.value.findIndex(i => i.id === row.id)
+    if (idx !== -1) items.value[idx] = { ...items.value[idx], quantity: String(next) }
+  } catch (e) { alert('Ошибка: ' + (e.message || e)) }
+}
+
 async function deleteItem(row) {
   if (!isAdmin.value) { openLoginModal(() => deleteItem(row)); return }
   if (!confirm(`Удалить позицию "${row.name || row.name_ru || row.name_en || ''}"?`)) return
@@ -857,6 +906,9 @@ const INSTRUMENTS = [
 const DURATIONS = [
   { val: 30, key: 'dur30' }, { val: 60, key: 'dur60' }, { val: 90, key: 'dur90' },
   { val: 120, key: 'dur120' }, { val: 180, key: 'dur180' }, { val: 240, key: 'dur240' },
+  { val: 300, key: 'dur300' }, { val: 360, key: 'dur360' }, { val: 420, key: 'dur420' },
+  { val: 480, key: 'dur480' }, { val: 540, key: 'dur540' }, { val: 600, key: 'dur600' },
+  { val: 660, key: 'dur660' }, { val: 720, key: 'dur720' },
 ]
 
 const INSTR_INFO = {
@@ -938,13 +990,13 @@ const bookings = ref([])
 
 async function loadAllBookings() {
   try {
-    const offset = bookingWeek.value === 'this' ? 0 : 1
+    const offset = bookingWeekOffset.value
     const data = await api(`/api/instrument-usage?${qs({ period: 'week', offset })}`)
     bookings.value = data.results.map(u => {
       const start = new Date(u.start_time)
       const end = new Date(u.end_time)
       const duration = Math.round((end - start) / 60000)
-      const dateStr = start.toISOString().slice(0, 10)
+      const dateStr = toLocalDateStr(start)
       return {
         id: u.id, apiId: u.id, instrId: u.instrument_id,
         date: dateStr, who: u.username, experiment: u.notes || '',
@@ -962,8 +1014,108 @@ function loadBookingData() {
   loadCellBookings()
 }
 
+let scheduleRefreshTimer = null
+
+function startScheduleAutoRefresh() {
+  stopScheduleAutoRefresh()
+
+  scheduleRefreshTimer = window.setInterval(() => {
+    if (activeTab.value === 'booking') {
+      loadBookingData()
+    }
+  }, 5000)
+}
+
+function stopScheduleAutoRefresh() {
+  if (scheduleRefreshTimer) {
+    window.clearInterval(scheduleRefreshTimer)
+    scheduleRefreshTimer = null
+  }
+}
+
 const selectedInstrId = ref(INSTRUMENTS[0].id)
+const selectedBookingRoom = ref('instruments')
+
+function selectInstrument(instrId) {
+  selectedBookingRoom.value = 'instruments'
+  selectedInstrId.value = instrId
+}
+function selectCellCultureRoom() {
+  selectedBookingRoom.value = 'cell'
+  loadCellBookings()
+}
+
 const bookingWeek = ref('this')
+const bookingWeekOffset = ref(0)
+const showWeekCalendarModal = ref(false)
+const weekCalendarTarget = ref('instrument')
+const weekCalendarViewDate = ref(new Date())
+
+function openWeekCalendar(target) {
+  weekCalendarTarget.value = target
+  weekCalendarViewDate.value = new Date()
+  showWeekCalendarModal.value = true
+}
+function calendarMonthDays() {
+  const view = weekCalendarViewDate.value
+  const year = view.getFullYear()
+  const month = view.getMonth()
+  const first = new Date(year, month, 1)
+  const startDay = first.getDay() === 0 ? 6 : first.getDay() - 1
+  const start = new Date(first)
+  start.setDate(first.getDate() - startDay)
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(start); d.setDate(start.getDate() + i)
+    return d
+  })
+}
+function calendarPrevMonth() {
+  const v = weekCalendarViewDate.value
+  weekCalendarViewDate.value = new Date(v.getFullYear(), v.getMonth() - 1, 1)
+}
+function calendarNextMonth() {
+  const v = weekCalendarViewDate.value
+  weekCalendarViewDate.value = new Date(v.getFullYear(), v.getMonth() + 1, 1)
+}
+function calendarPrevYear() {
+  const v = weekCalendarViewDate.value
+  weekCalendarViewDate.value = new Date(v.getFullYear() - 1, v.getMonth(), 1)
+}
+function calendarNextYear() {
+  const v = weekCalendarViewDate.value
+  weekCalendarViewDate.value = new Date(v.getFullYear() + 1, v.getMonth(), 1)
+}
+function weekOffsetForDate(picked) {
+  const now = new Date(); now.setHours(0,0,0,0)
+  const curDay = now.getDay() === 0 ? 6 : now.getDay() - 1
+  const curMonday = new Date(now); curMonday.setDate(now.getDate() - curDay)
+  const p = new Date(picked); p.setHours(0,0,0,0)
+  const pDay = p.getDay() === 0 ? 6 : p.getDay() - 1
+  const pMonday = new Date(p); pMonday.setDate(p.getDate() - pDay)
+  return Math.round((pMonday - curMonday) / (7 * 24 * 60 * 60 * 1000))
+}
+function selectCalendarDay(day) {
+  const offset = weekOffsetForDate(day)
+  if (weekCalendarTarget.value === 'instrument') {
+    bookingWeekOffset.value = offset
+    loadAllBookings()
+  } else {
+    cellBookingWeekOffset.value = offset
+    loadCellBookings()
+  }
+  showWeekCalendarModal.value = false
+}
+
+function isSelectedWeek(day) {
+  const offset = weekCalendarTarget.value === 'instrument' ? bookingWeekOffset.value : cellBookingWeekOffset.value
+  const weekDates = getWeekDates(offset)
+  return weekDates.some(d => toDateStr(d) === toDateStr(day))
+}
+
+function calendarToday() {
+  weekCalendarViewDate.value = new Date()
+}
+
 const showBookingModal = ref(false)
 const showInstrInfoModal = ref(false)
 const showAdminStatusModal = ref(false)
@@ -993,7 +1145,12 @@ function minutesToLabel(total) {
 }
 
 
-
+function toLocalDateStr(dateObj) {
+  const y = dateObj.getFullYear()
+  const mo = String(dateObj.getMonth() + 1).padStart(2, '0')
+  const d = String(dateObj.getDate()).padStart(2, '0')
+  return `${y}-${mo}-${d}`
+}
 
 
 
@@ -1012,10 +1169,14 @@ function toLocalDateTimeStr(dateObj) {
 
 const startTimeLabel = computed(() => minutesToLabel(bookingForm.startMinutes))
 const endTimeLabel = computed(() => minutesToLabel(bookingForm.startMinutes + bookingForm.duration))
-const durationLabel = computed(() => {
-  const d = DURATIONS.find(x => x.val === bookingForm.duration)
-  return d ? t(d.key) : `${bookingForm.duration} мин`
-})
+function durationToLabel(minutes) {
+  const total = Number(minutes) || 0
+  const hours = Math.floor(total / 60)
+  const mins = total % 60
+  return `${hours}:${String(mins).padStart(2, '0')}`
+}
+
+const durationLabel = computed(() => durationToLabel(bookingForm.duration))
 const maxStartMinutes = computed(() => DAY_END - bookingForm.duration)
 
 const timelineFillStyle = computed(() => {
@@ -1080,13 +1241,19 @@ function getWeekDates(offset = 0) {
 
 const thisWeekDates = computed(() => getWeekDates(0))
 const nextWeekDates = computed(() => getWeekDates(1))
-const currentWeekDates = computed(() => bookingWeek.value === 'this' ? thisWeekDates.value : nextWeekDates.value)
+const currentWeekDates = computed(() => getWeekDates(bookingWeekOffset.value))
+const currentWeekLabel = computed(() => {
+  const d = currentWeekDates.value[0]
+  const d2 = currentWeekDates.value[6]
+  const opts = { day: 'numeric', month: 'short' }
+  return `${d.toLocaleDateString('ru-RU', opts)} – ${d2.toLocaleDateString('ru-RU', opts)}`
+})
 
 function formatDate(d) {
   return d.toLocaleDateString(language.value === 'ru' ? 'ru-RU' : 'en-GB', { weekday: 'short', day: '2-digit', month: '2-digit' })
 }
 function toDateStr(d) {
-  return d.toISOString().slice(0, 10)
+  return toLocalDateStr(d)
 }
 
 function getBookingsForDay(instrId, dateStr) {
@@ -1214,7 +1381,7 @@ function openAdminStatusModal(instrId) {
       const from = new Date(m.date_from)
       const to = new Date(m.date_to)
       for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-        dates.push(d.toISOString().slice(0, 10))
+        dates.push(toLocalDateStr(d))
       }
       return dates
     })
@@ -1275,6 +1442,7 @@ const selectedInstrInfo = computed(() => INSTR_INFO[selectedInstrId.value] || {}
 // ─── CELL CULTURE MODULE ─────────────────────────────────────────────────────
 const cellBookings = ref([])
 const cellBookingWeek = ref('this')
+const cellBookingWeekOffset = ref(0)
 const showCellBookingModal = ref(false)
 const editingCellBookingId = ref(null)
 const cellBookingForm = reactive({
@@ -1285,7 +1453,7 @@ const cellBookingSaving = ref(false)
 
 async function loadCellBookings() {
   try {
-    const offset = cellBookingWeek.value === 'this' ? 0 : 1
+    const offset = cellBookingWeek.value
     const data = await api(`/api/cell-usage?period=week&offset=${offset}`)
     cellBookings.value = (data.results || []).map(u => {
       const start = new Date(u.start_time)
@@ -1295,7 +1463,7 @@ async function loadCellBookings() {
         id: u.id,
         apiId: u.id,
         boxNumber: u.box_number,
-        date: start.toISOString().slice(0, 10),
+        date: toLocalDateStr(start),
         who: u.user_name,
         experiment: u.experiment || '',
         duration: duration,
@@ -1439,7 +1607,18 @@ async function deleteCellBooking(b) {
   } catch (e) {}
 }
 
-const cellWeekDates = computed(() => cellBookingWeek.value === 'this' ? thisWeekDates.value : nextWeekDates.value)
+const cellWeekDates = computed(() => getWeekDates(cellBookingWeekOffset.value))
+const cellWeekLabel = computed(() => {
+  const d = cellWeekDates.value[0]
+  const d2 = cellWeekDates.value[6]
+  const opts = { day: 'numeric', month: 'short' }
+  return `${d.toLocaleDateString('ru-RU', opts)} – ${d2.toLocaleDateString('ru-RU', opts)}`
+})
+const expandedCellBox = ref(null)
+function toggleCellBox(box) {
+  expandedCellBox.value = expandedCellBox.value === box ? null : box
+  if (expandedCellBox.value) loadCellBookings()
+}
 
 // ─── EXPERIMENTS MODULE ──────────────────────────────────────────────────────
 const activeExperimentTab = ref('alamar')
@@ -1663,7 +1842,24 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             </div>
           </div>
 
-          <div class="desktop-filter-row" v-if="activeTab !== 'protocols' && activeTab !== 'booking' && activeTab !== 'experiments'">
+          <div class="desktop-filter-row" v-if="activeTab === 'equipment'">
+            <div class="toolbar-block filters-block equipment-protocols-block">
+              <div class="group-title">{{ t('selectInstrument') }}</div>
+              <div class="room-line">
+                <button
+                  v-for="instr in INSTRUMENTS"
+                  :key="instr.id"
+                  type="button"
+                  class="room-chip instr-chip"
+                  @click="openInstrInfoModal(instr.id)"
+                >
+                  {{ instr.icon }} {{ t(instr.labelKey) }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="desktop-filter-row" v-if="activeTab !== 'protocols' && activeTab !== 'booking' && activeTab !== 'experiments' && activeTab !== 'equipment'">
             <div class="toolbar-block filters-block">
               <div class="group-title">{{ t('room') }}</div>
               <div class="room-line">
@@ -1682,20 +1878,31 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
           </div>
 
           <div class="desktop-filter-row" v-if="activeTab === 'booking'">
-            <div class="toolbar-block filters-block">
+            <div class="toolbar-block filters-block booking-selector-block">
               <div class="group-title">{{ t('selectInstrument') }}</div>
               <div class="room-line">
                 <button
                   v-for="instr in INSTRUMENTS" :key="instr.id"
                   class="room-chip instr-chip"
                   :class="{
-                    active: selectedInstrId === instr.id,
+                    active: selectedBookingRoom === 'instruments' && selectedInstrId === instr.id,
                     'instr-maint': getInstrStatus(instr.id).status !== 'ok'
                   }"
-                  @click="selectedInstrId = instr.id"
+                  @click="selectInstrument(instr.id)"
                 >
                   {{ instr.icon }} {{ t(instr.labelKey) }}
                   <span v-if="getInstrStatus(instr.id).status !== 'ok'" class="instr-maint-dot" title="Техобслуживание">⚠️</span>
+                </button>
+              </div>
+
+              <div class="group-title booking-room-title">{{ t('selectRoom') }}</div>
+              <div class="room-line">
+                <button
+                  class="room-chip cell-culture-room-chip"
+                  :class="{ active: selectedBookingRoom === 'cell' }"
+                  @click="selectCellCultureRoom"
+                >
+                  🧫 {{ t('cellCulture') }}
                 </button>
               </div>
             </div>
@@ -1726,6 +1933,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
           <!-- ═══ BOOKING SECTION ═══ -->
           <section v-if="activeTab === 'booking'" class="booking-section">
 
+            <template v-if="selectedBookingRoom === 'instruments'">
             <div v-if="selectedInstr && getInstrStatus(selectedInstr.id).status !== 'ok'" class="maint-alert-banner">
               ⛔ {{ selectedInstr.icon }} <strong>{{ t(selectedInstr.labelKey) }}</strong> {{ t('bookingMaintAlert') }}.
               <span v-if="getInstrStatus(selectedInstr.id).reason" class="maint-reason">{{ getInstrStatus(selectedInstr.id).reason }}</span>
@@ -1746,8 +1954,10 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             </div>
 
             <div class="week-toggle-row">
-              <button class="week-tab" :class="{ active: bookingWeek === 'this' }" @click="bookingWeek = 'this'; loadAllBookings()">{{ t('thisWeek') }}</button>
-              <button class="week-tab" :class="{ active: bookingWeek === 'next' }" @click="bookingWeek = 'next'; loadAllBookings()">{{ t('nextWeek') }}</button>
+              <button class="week-tab" :class="{ active: bookingWeekOffset === 0 }" @click="bookingWeekOffset = 0; loadAllBookings()">{{ t('thisWeek') }}</button>
+              <button class="week-tab" :class="{ active: bookingWeekOffset === 1 }" @click="bookingWeekOffset = 1; loadAllBookings()">{{ t('nextWeek') }}</button>
+              <button class="week-tab week-tab-calendar" @click="openWeekCalendar('instrument')">📅</button>
+              <span class="week-current-label">{{ currentWeekLabel }}</span>
             </div>
 
             <div v-if="bookingError && !showBookingModal" class="booking-inline-error">⚠️ {{ bookingError }}</div>
@@ -1759,21 +1969,19 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                   <div v-if="isDateUnavail(selectedInstrId, toDateStr(day))" class="booking-day-maint-label">🔧 ТО</div>
                 </div>
                 <div class="booking-day-slots">
-                  <div v-if="!isDateUnavail(selectedInstrId, toDateStr(day))">
-                    <div v-for="b in getBookingsForDay(selectedInstrId, toDateStr(day))" :key="b.id" class="booking-slot">
-                      <div class="booking-slot-who">👤 {{ b.who }}</div>
-                      <div class="booking-slot-exp">{{ b.experiment }}</div>
-                      <div class="booking-slot-dur muted">⏱ {{ DURATIONS.find(d=>d.val===b.duration)?.val || b.duration }} мин</div>
-                      <div v-if="b.comments" class="booking-slot-comment muted">💬 {{ b.comments }}</div>
-                      <div class="booking-slot-actions">
-                        <button class="icon-btn" :title="t('edit')" @click="openEditBookingModal(b)">✏️</button>
-                        <button class="icon-btn" :title="t('bookingDelete')" @click="deleteBooking(b)">🗑️</button>
-                      </div>
+                  <div v-if="isDateUnavail(selectedInstrId, toDateStr(day))" class="booking-maint-notice">🔧 {{ t('bookingUnavailDay') }}</div>
+                  <div v-for="b in getBookingsForDay(selectedInstrId, toDateStr(day))" :key="b.id" class="booking-slot">
+                    <div class="booking-slot-who">👤 {{ b.who }}</div>
+                    <div class="booking-slot-exp">{{ b.experiment }}</div>
+                    <div class="booking-slot-dur muted">⏱ {{ durationToLabel(b.duration) }}</div>
+                    <div v-if="b.comments" class="booking-slot-comment muted">💬 {{ b.comments }}</div>
+                    <div class="booking-slot-actions">
+                      <button class="icon-btn" :title="t('edit')" @click="openEditBookingModal(b)">✏️</button>
+                      <button class="icon-btn" :title="t('bookingDelete')" @click="deleteBooking(b)">🗑️</button>
                     </div>
-                    <div v-if="!getBookingsForDay(selectedInstrId, toDateStr(day)).length" class="booking-empty-day">—</div>
-                    <button class="booking-add-btn" @click="openBookingModal(selectedInstrId, toDateStr(day))">+ {{ t('bookSlot') }}</button>
                   </div>
-                  <div v-else class="booking-maint-day">🔧 {{ t('bookingUnavailDay') }}</div>
+                  <div v-if="!getBookingsForDay(selectedInstrId, toDateStr(day)).length" class="booking-empty-day">—</div>
+                  <button class="booking-add-btn" @click="openBookingModal(selectedInstrId, toDateStr(day))">+ {{ t('bookSlot') }}</button>
                 </div>
               </div>
             </div>
@@ -1784,9 +1992,10 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                   <span>{{ formatDate(day) }}</span>
                   <span v-if="isDateUnavail(selectedInstrId, toDateStr(day))" class="muted">🔧 ТО</span>
                 </div>
-                <div v-if="!isDateUnavail(selectedInstrId, toDateStr(day))">
+                <div>
+                  <div v-if="isDateUnavail(selectedInstrId, toDateStr(day))" class="booking-maint-notice">🔧 {{ t('bookingUnavailDay') }}</div>
                   <div v-for="b in getBookingsForDay(selectedInstrId, toDateStr(day))" :key="b.id" class="booking-slot booking-slot-mobile">
-                    <div class="booking-slot-who">👤 <strong>{{ b.who }}</strong> · ⏱ {{ b.duration }} мин</div>
+                    <div class="booking-slot-who">👤 <strong>{{ b.who }}</strong> · ⏱ {{ durationToLabel(b.duration) }}</div>
                     <div class="booking-slot-exp">{{ b.experiment }}</div>
                     <div v-if="b.comments" class="booking-slot-comment muted">💬 {{ b.comments }}</div>
                     <div class="booking-slot-actions">
@@ -1797,10 +2006,12 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                   <div v-if="!getBookingsForDay(selectedInstrId, toDateStr(day)).length" class="muted booking-no-entries">{{ t('noBookings') }}</div>
                   <button class="booking-add-btn-mobile" @click="openBookingModal(selectedInstrId, toDateStr(day))">+ {{ t('bookSlot') }}</button>
                 </div>
-                <div v-else class="booking-maint-day muted">🔧 {{ t('bookingUnavailDay') }}</div>
               </div>
             </div>
 
+            </template>
+
+            <template v-if="selectedBookingRoom === 'cell'">
             <!-- ═══ CELL CULTURE ═══ -->
             <div class="cell-culture-divider">
               <div class="cell-culture-title">🧫 {{ t('cellCulture') }}</div>
@@ -1808,13 +2019,22 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             </div>
 
             <div class="week-toggle-row">
-              <button class="week-tab" :class="{ active: cellBookingWeek === 'this' }" @click="cellBookingWeek = 'this'; loadCellBookings()">{{ t('thisWeek') }}</button>
-              <button class="week-tab" :class="{ active: cellBookingWeek === 'next' }" @click="cellBookingWeek = 'next'; loadCellBookings()">{{ t('nextWeek') }}</button>
+              <button class="week-tab" :class="{ active: cellBookingWeekOffset === 0 }" @click="cellBookingWeekOffset = 0; loadCellBookings()">{{ t('thisWeek') }}</button>
+              <button class="week-tab" :class="{ active: cellBookingWeekOffset === 1 }" @click="cellBookingWeekOffset = 1; loadCellBookings()">{{ t('nextWeek') }}</button>
+              <button class="week-tab week-tab-calendar" @click="openWeekCalendar('cell')">📅</button>
+              <span class="week-current-label">{{ cellWeekLabel }}</span>
             </div>
 
             <div v-for="box in [1,2]" :key="box" class="cell-box-section">
-              <div class="cell-box-header">{{ t('cellBox') }} №{{ box }}</div>
-              <div v-if="!isMobile" class="booking-grid">
+              <button
+                class="cell-box-accordion-btn"
+                :class="{ 'cell-box-accordion-open': expandedCellBox === box }"
+                @click="toggleCellBox(box)"
+              >
+                <span>🧫 {{ t('cellBox') }} №{{ box }}</span>
+                <span class="cell-box-accordion-arrow">{{ expandedCellBox === box ? '▲' : '▼' }}</span>
+              </button>
+              <div v-if="!isMobile && expandedCellBox === box" class="booking-grid">
                 <div v-for="day in cellWeekDates" :key="toDateStr(day)+'-box-'+box" class="booking-day-col">
                   <div class="booking-day-header" :class="{ 'day-today': toDateStr(day) === toDateStr(new Date()) }">
                     <div class="booking-day-name">{{ formatDate(day) }}</div>
@@ -1834,13 +2054,13 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                   </div>
                 </div>
               </div>
-              <div v-else class="booking-mobile-list">
+              <div v-else-if="expandedCellBox === box" class="booking-mobile-list">
                 <div v-for="day in cellWeekDates" :key="toDateStr(day)+'-box-'+box" class="booking-mobile-day">
                   <div class="booking-mobile-day-header" :class="{ 'day-today': toDateStr(day) === toDateStr(new Date()) }">
                     <span>{{ formatDate(day) }}</span>
                   </div>
                   <div v-for="b in getCellBookingsForDay(box, toDateStr(day))" :key="b.id" class="booking-slot booking-slot-mobile">
-                    <div class="booking-slot-who">👤 <strong>{{ b.who }}</strong> · ⏱ {{ b.duration }} мин</div>
+                    <div class="booking-slot-who">👤 <strong>{{ b.who }}</strong> · ⏱ {{ durationToLabel(b.duration) }}</div>
                     <div class="booking-slot-exp">{{ b.experiment }}</div>
                   </div>
                   <div v-if="!getCellBookingsForDay(box, toDateStr(day)).length" class="muted booking-no-entries">{{ t('noBookings') }}</div>
@@ -1848,6 +2068,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                 </div>
               </div>
             </div>
+            </template>
           </section>
 
           <!-- ═══ EXPERIMENTS SECTION ═══ -->
@@ -1998,7 +2219,16 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                 <tbody>
                   <tr v-for="row in items" :key="row.id">
                     <td class="mono">{{ row.code || row.inventory_number || '—' }}</td>
-                    <td><strong>{{ row.name || row.name_ru || row.name_en || t('noName') }}</strong></td>
+                    <td>
+  <div class="name-cell">
+    <div class="name-line">
+      <strong :class="{ 'name-truncate': !expandedNames.has(row.id) && isLongName(row) }">{{ row.name || row.name_ru || row.name_en || t('noName') }}</strong>
+      <span v-if="stockLevel(row) === 'low'" class="stock-badge stock-badge-low" title="Заканчивается">⚠️</span>
+      <span v-if="stockLevel(row) === 'empty'" class="stock-badge stock-badge-empty" title="Закончилось">⛔</span>
+    </div>
+    <button v-if="isLongName(row)" type="button" class="name-toggle-btn" @click.prevent="toggleNameExpand(row.id)">{{ expandedNames.has(row.id) ? '▲' : '▼' }}</button>
+  </div>
+</td>
                     <td v-if="activeTab === 'reagent'">
                       <div>{{ row.formula || '—' }}</div><div class="muted">{{ row.cas || '' }}</div>
                     </td>
@@ -2010,9 +2240,19 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                     <td>{{ place(row) }}</td>
                     <td><div class="detail-list"><div v-for="(d,i) in details(row)" :key="i">{{ d }}</div></div></td>
                     <td>
-                      <div class="row-actions">
-                        <button class="icon-btn" :title="t('edit')" @click="openEditModal(row)">✏️</button>
-                        <button v-if="isAdmin" class="icon-btn" :title="t('remove')" @click="deleteItem(row)">🗑️</button>
+                      <div class="row-actions row-actions-split">
+                        <div class="row-actions-left">
+                          <button type="button" class="icon-btn stock-plus" title="Увеличить количество" @click.prevent="changeQuantity(row, 1)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#16a34a" fill="#dcfce7"/><rect x="7" y="3.5" width="2" height="9" rx="1" fill="#16a34a"/><rect x="3.5" y="7" width="9" height="2" rx="1" fill="#16a34a"/></svg>
+                          </button>
+                          <button type="button" class="icon-btn stock-minus" title="Уменьшить количество" @click.prevent="changeQuantity(row, -1)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#dc2626" fill="#fee2e2"/><rect x="3.5" y="7" width="9" height="2" rx="1" fill="#dc2626"/></svg>
+                          </button>
+                        </div>
+                        <div class="row-actions-right">
+                          <button class="icon-btn" :title="t('edit')" @click="openEditModal(row)">✏️</button>
+                          <button v-if="isAdmin" class="icon-btn" :title="t('remove')" @click="deleteItem(row)">🗑️</button>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -2036,10 +2276,23 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <div class="mobile-item-list">
                 <div v-for="row in items" :key="row.id" class="mobile-item-card">
                   <div class="mobile-item-top">
-                    <strong class="mobile-item-name">{{ row.name || row.name_ru || row.name_en || t('noName') }}</strong>
-                    <div class="row-actions">
-                      <button class="icon-btn" :title="t('edit')" @click="openEditModal(row)">✏️</button>
-                      <button v-if="isAdmin" class="icon-btn" :title="t('remove')" @click="deleteItem(row)">🗑️</button>
+                    <div class="name-cell">
+  <strong class="mobile-item-name" :class="{ 'name-truncate': !expandedNames.has(row.id) && isLongName(row) }">{{ row.name || row.name_ru || row.name_en || t('noName') }}</strong>
+  <button v-if="isLongName(row)" type="button" class="name-toggle-btn" @click.prevent="toggleNameExpand(row.id)">{{ expandedNames.has(row.id) ? '▲' : '▼' }}</button>
+</div>
+                    <div class="row-actions row-actions-split">
+                      <div class="row-actions-left">
+                        <button type="button" class="icon-btn stock-plus" title="Увеличить количество" @click.prevent="changeQuantity(row, 1)">
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#16a34a" fill="#dcfce7"/><rect x="7" y="3.5" width="2" height="9" rx="1" fill="#16a34a"/><rect x="3.5" y="7" width="9" height="2" rx="1" fill="#16a34a"/></svg>
+                        </button>
+                        <button type="button" class="icon-btn stock-minus" title="Уменьшить количество" @click.prevent="changeQuantity(row, -1)">
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="7.5" stroke="#dc2626" fill="#fee2e2"/><rect x="3.5" y="7" width="9" height="2" rx="1" fill="#dc2626"/></svg>
+                        </button>
+                      </div>
+                      <div class="row-actions-right">
+                        <button class="icon-btn" :title="t('edit')" @click="openEditModal(row)">✏️</button>
+                        <button v-if="isAdmin" class="icon-btn" :title="t('remove')" @click="deleteItem(row)">🗑️</button>
+                      </div>
                     </div>
                   </div>
                   <div class="mobile-item-row" v-if="row.code || row.inventory_number">
@@ -2288,7 +2541,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               </div>
               <div class="time-slider-row">
                 <span class="time-slider-tag">{{ t('bookingDuration') }}</span>
-                <input type="range" class="time-range" min="30" max="240" step="30" v-model.number="bookingForm.duration" />
+                <input type="range" class="time-range" min="30" max="720" step="30" v-model.number="bookingForm.duration" />
                 <span class="time-slider-value">{{ durationLabel }}</span>
               </div>
               <div class="time-timeline">
@@ -2345,8 +2598,8 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               </div>
               <div class="time-slider-row">
                 <span class="time-slider-tag">{{ t('bookingDuration') }}</span>
-                <input type="range" class="time-range" min="30" max="240" step="30" v-model.number="cellBookingForm.duration" />
-                <span class="time-slider-value">{{ DURATIONS.find(d=>d.val===cellBookingForm.duration)?.val || cellBookingForm.duration }} мин</span>
+                <input type="range" class="time-range" min="30" max="720" step="30" v-model.number="cellBookingForm.duration" />
+                <span class="time-slider-value">{{ durationToLabel(cellBookingForm.duration) }}</span>
               </div>
             </div>
           </div>
@@ -2466,6 +2719,84 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
       </div>
     </div>
 
+  </div>
+  <div v-if="showWeekCalendarModal" class="modal-overlay" @click.self="showWeekCalendarModal = false">
+    <div class="modal-box week-calendar-modal">
+      <div class="week-calendar-header">
+        <button type="button" class="week-calendar-nav-btn" @click="calendarPrevMonth">‹</button>
+        <div class="week-calendar-title">
+          {{ weekCalendarViewDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) }}
+        </div>
+        <button type="button" class="week-calendar-nav-btn" @click="calendarNextMonth">›</button>
+      </div>
+
+      <div class="week-calendar-weekdays">
+        <div v-for="dn in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']" :key="dn" class="week-calendar-weekday">
+          {{ dn }}
+        </div>
+      </div>
+
+      <div class="week-calendar-days">
+        <button
+          v-for="(day, i) in calendarMonthDays()"
+          :key="i"
+          type="button"
+          class="week-calendar-day"
+          :class="{
+            'other-month': day.getMonth() !== weekCalendarViewDate.getMonth(),
+            'is-today': toDateStr(day) === toDateStr(new Date()),
+            'is-selected': isSelectedWeek(day)
+          }"
+          @click="selectCalendarDay(day)"
+        >
+          {{ day.getDate() }}
+        </button>
+      </div>
+
+      <div class="week-calendar-footer">
+        <button type="button" class="btn btn-ghost" @click="calendarToday">Сегодня</button>
+        <button type="button" class="btn" @click="showWeekCalendarModal = false">Закрыть</button>
+      </div>
+    </div>
+  </div>
+  <div v-if="showWeekCalendarModal" class="modal-overlay" @click.self="showWeekCalendarModal = false">
+    <div class="modal-box week-calendar-modal">
+      <div class="week-calendar-header">
+        <button type="button" class="week-calendar-nav-btn" @click="calendarPrevMonth">‹</button>
+        <div class="week-calendar-title">
+          {{ weekCalendarViewDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) }}
+        </div>
+        <button type="button" class="week-calendar-nav-btn" @click="calendarNextMonth">›</button>
+      </div>
+
+      <div class="week-calendar-weekdays">
+        <div v-for="dn in ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']" :key="dn" class="week-calendar-weekday">
+          {{ dn }}
+        </div>
+      </div>
+
+      <div class="week-calendar-days">
+        <button
+          v-for="(day, i) in calendarMonthDays()"
+          :key="i"
+          type="button"
+          class="week-calendar-day"
+          :class="{
+            'other-month': day.getMonth() !== weekCalendarViewDate.getMonth(),
+            'is-today': toDateStr(day) === toDateStr(new Date()),
+            'is-selected': isSelectedWeek(day)
+          }"
+          @click="selectCalendarDay(day)"
+        >
+          {{ day.getDate() }}
+        </button>
+      </div>
+
+      <div class="week-calendar-footer">
+        <button type="button" class="btn btn-ghost" @click="calendarToday">Сегодня</button>
+        <button type="button" class="btn" @click="showWeekCalendarModal = false">Закрыть</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -2622,6 +2953,27 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .icon-btn { border: 1px solid var(--color-border); background: var(--color-surface-2); border-radius: 999px; width: 34px; height: 34px; display: grid; place-items: center; font-size: .95rem; flex-shrink: 0; }
 .icon-btn:hover { background: var(--color-accent); }
 .row-actions { display: flex; gap: .3rem; }
+.row-actions-split {
+  justify-content: flex-start;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+.row-actions-left,
+.row-actions-right {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.stock-plus,
+.stock-minus {
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stock-plus:hover svg circle { fill: #bbf7d0; }
+.stock-minus:hover svg circle { fill: #fecaca; }
+
 .protocol-list { display: grid; gap: var(--space-4); width: 100%; }
 .protocol-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); background: var(--color-surface-2); width: 100%; overflow-x: hidden; }
 .protocol-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); flex-wrap: wrap; gap: .5rem; }
@@ -2648,7 +3000,33 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .booking-instr-title { display: flex; align-items: center; gap: var(--space-3); }
 .booking-instr-icon { font-size: 2rem; }
 .booking-header-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-.week-toggle-row { display: flex; gap: .5rem; }
+.week-toggle-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.week-tab-calendar { padding: .4rem .6rem; }
+.week-current-label { font-size: var(--text-sm); color: var(--color-text-muted); margin-left: auto; }
+
+.week-calendar-modal {
+  max-width: 320px;
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+.week-calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.week-calendar-nav-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--color-primary); padding: .2rem .5rem; }
+.week-calendar-title { font-weight: 600; font-size: var(--text-base); text-transform: capitalize; color: var(--color-text); }
+
+.week-calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.week-calendar-weekday { text-align: center; font-size: var(--text-xs); color: var(--color-text-muted); padding: 4px 0; font-weight: 500; }
+
+.week-calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.week-calendar-day { background: none; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: var(--text-sm); display: flex; align-items: center; justify-content: center; color: var(--color-text); }
+.week-calendar-day:hover { background: var(--color-accent); }
+.week-calendar-day.other-month { color: var(--color-text-muted); opacity: .4; }
+.week-calendar-day.is-today { background: var(--color-primary); color: #fff; font-weight: 600; }
+.week-calendar-day.is-selected { background: var(--color-accent); font-weight: 600; }
+
+.week-calendar-footer { display: flex; justify-content: space-between; margin-top: var(--space-3); }
 .week-tab { border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); border-radius: 999px; padding: .65rem 1.2rem; font-size: var(--text-sm); }
 .week-tab.active { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; border-color: transparent; }
 .booking-inline-error { background: color-mix(in srgb, var(--color-error) 10%, var(--color-surface)); border: 1px solid var(--color-error); color: var(--color-error); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
@@ -2684,6 +3062,7 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 }
 .booking-add-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .booking-maint-day { background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface)); border: 1px solid color-mix(in srgb, var(--color-error) 30%, var(--color-border)); border-radius: var(--radius-md); padding: var(--space-3); font-size: var(--text-xs); color: var(--color-error); text-align: center; }
+.booking-maint-notice { background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface)); border: 1px solid color-mix(in srgb, var(--color-error) 30%, var(--color-border)); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: var(--text-xs); color: var(--color-error); text-align: center; margin-bottom: var(--space-2); }
 .booking-mobile-list { display: grid; gap: var(--space-3); }
 .booking-mobile-day { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
 .booking-mobile-day-header { padding: var(--space-3) var(--space-4); font-weight: 700; font-size: var(--text-sm); background: var(--color-surface-2); border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; }
@@ -2706,9 +3085,22 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 
 /* Cell culture */
 .cell-culture-divider { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 2px solid var(--color-border); }
+.equipment-protocols-block .room-line { align-items: stretch; }
+.equipment-protocols-block .instr-chip { white-space: normal; text-align: left; }
 .cell-culture-title { font-family: var(--font-display); font-size: var(--text-lg); color: var(--color-primary); }
 .cell-box-section { margin-top: var(--space-4); }
 .cell-box-header { font-weight: 700; font-size: var(--text-sm); margin-bottom: var(--space-2); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.cell-box-accordion-btn {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface); border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg); font-weight: 700; font-size: var(--text-base);
+  color: var(--color-text); margin-bottom: var(--space-2);
+  transition: border-color .15s, background .15s;
+}
+.cell-box-accordion-btn:hover { border-color: var(--color-primary); }
+.cell-box-accordion-open { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+.cell-box-accordion-arrow { font-size: var(--text-sm); color: var(--color-text-muted); }
 
 /* Admin status modal with visual date picker */
 .modal-card-admin-status { width: min(560px, 100%); }
@@ -2866,6 +3258,14 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .repeat-last-line { display: grid; gap: .6rem; }
 .repeat-last-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
 .repeat-btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.stock-plus, .stock-minus { padding: 2px; display: inline-flex; align-items: center; justify-content: center; }
+.stock-plus:hover svg circle { fill: #bbf7d0; }
+.stock-minus:hover svg circle { fill: #fecaca; }
+tr:has(.stock-minus[title="Вернуть в наличие"]) { opacity: 0.6; }
+.stock-plus, .stock-minus { padding: 2px; display: inline-flex; align-items: center; justify-content: center; }
+.stock-plus:hover svg circle { fill: #bbf7d0; }
+.stock-minus:hover svg circle { fill: #fecaca; }
+tr:has(.stock-minus[title="Вернуть в наличие"]) { opacity: 0.6; }
 
 /* Mobile layouts */
 .mobile-catalog-view { display: grid; gap: var(--space-4); }
@@ -2874,6 +3274,16 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .mobile-item-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--color-surface-2); width: 100%; }
 .mobile-item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); margin-bottom: var(--space-2); }
 .mobile-item-name { font-size: var(--text-base); overflow-wrap: break-word; word-break: break-word; }
+.name-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.name-line { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.stock-badge { font-size: var(--text-xs); padding: 1px 6px; border-radius: 999px; flex-shrink: 0; }
+.stock-badge-low { background: #fef3c7; color: #92400e; }
+.stock-badge-empty { background: #fee2e2; color: #991b1b; }
+[data-theme="dark"] .stock-badge-low { background: #451a03; color: #fbbf24; }
+[data-theme="dark"] .stock-badge-empty { background: #450a0a; color: #f87171; }
+.name-truncate { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.name-toggle-btn { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-xs); padding: 0; margin-top: 2px; line-height: 1; }
+.name-toggle-btn:hover { color: var(--color-primary); }
 .mobile-item-row { font-size: var(--text-sm); padding: .25rem 0; border-top: 1px dashed var(--color-border); overflow-wrap: anywhere; white-space: pre-wrap; }
 .mobile-item-row:first-of-type { border-top: none; }
 .mobile-item-label { color: var(--color-text-muted); margin-right: .4rem; }

@@ -88,7 +88,7 @@ const i18n = {
     loginError: 'Неверный логин или пароль',
     adminOn: 'Администратор: ВКЛ',
     adminOff: 'Войти как администратор',
-    adminHint: 'Логин: admin · Пароль: admin',
+    adminHint: '',
     searchItems: 'Найти реактив, оборудование, расходник...',
     searchProtocols: 'Найти протокол синтеза...',
     found: 'Найдено',
@@ -506,8 +506,8 @@ const protocolCategory = ref('')
 const isAdmin = ref(readStorage(ADMIN_STATE_KEY, false))
 watch(isAdmin, v => writeStorage(ADMIN_STATE_KEY, v))
 
-const ADMIN_LOGIN = 'admin'
-const ADMIN_PASSWORD = 'admin'
+const ADMIN_LOGIN = 'labadmin'
+const ADMIN_PASSWORD = 'S3cur3P@ss2026'
 
 const showLoginModal = ref(false)
 const loginForm = reactive({ login: '', password: '' })
@@ -2495,7 +2495,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
           <button class="btn btn-primary" @click="submitLogin">{{ t('loginButton') }}</button>
         </div>
         <div class="modal-body">
-          <div class="admin-hint">{{ t('adminHint') }}</div>
+          <!--<div class="admin-hint">{{ t('adminHint') }}</div>-->
           <div class="form-row"><label>{{ t('login') }}</label><input v-model="loginForm.login" type="text" autocomplete="username" @keyup.enter="submitLogin" /></div>
           <div class="form-row"><label>{{ t('password') }}</label><input v-model="loginForm.password" type="password" autocomplete="current-password" @keyup.enter="submitLogin" /></div>
           <div v-if="loginError" class="form-error">{{ loginError }}</div>
