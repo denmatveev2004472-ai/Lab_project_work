@@ -467,6 +467,7 @@ function goMobileHome() { mobileScreen.value = 'home' }
 function goMobileCatalog(tab) {
   activeTab.value = tab
   mobileScreen.value = 'catalog'
+  state.room = ''; state.cabinet = ''; expandedRoom.value = ''; cabinets.value = []
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
   else if (tab === 'experiments') { /* nothing to load */ }
@@ -480,6 +481,7 @@ function goMobileAddChoice() {
 const activeTab = ref('reagent')
 function setTab(tab) {
   activeTab.value = tab
+  state.room = ''; state.cabinet = ''; expandedRoom.value = ''; cabinets.value = []
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
   else if (tab === 'experiments') { /* nothing to load */ }
