@@ -3372,4 +3372,3 @@ tr:has(.stock-minus[title="Вернуть в наличие"]) { opacity: 0.6; }
   .chart-bar-row { grid-template-columns: 1fr; gap: var(--space-1); }
 }
 </style>
-
