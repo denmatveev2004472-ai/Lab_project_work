@@ -7,12 +7,13 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
-from io import BytesIO
+from io import BytesIO, StringIO
 from openpyxl import Workbook
 from docx import Document
 from datetime import datetime, timedelta, date
 import os
 import json
+import csv
 from dotenv import load_dotenv
 
 from database import get_db, init_db
@@ -628,6 +629,118 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     log_activity(db, "удалён", "item", item_id, name, "")
     db.commit()
     return {"ok": True}
+
+# ── CSV Import ────────────────────────────────────────────────────────────────
+
+# Ожидаемые колонки CSV:
+# item_type, code, name, name_ru, name_en, formula, cas,
+# quantity, unit, status, notes, room, cabinet, shelf, slot,
+# source_file, source_sheet
+
+@app.post("/api/import/reagents-csv")
+async def import_reagents_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Массовый импорт реактивов (и любых других типов) из CSV-файла.
+    Поддерживаемые кодировки: UTF-8 (с BOM или без), затем cp1251.
+    Возвращает: {ok, inserted, skipped, errors}.
+    Строка пропускается, если поля name, name_ru и name_en все пустые.
+    """
+    raw = await file.read()
+    # Попытка декодировать UTF-8 (с BOM), затем cp1251
+    for enc in ("utf-8-sig", "utf-8", "cp1251"):
+        try:
+            text_content = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise HTTPException(400, "Не удалось декодировать файл (попробуйте UTF-8 или cp1251)")
+
+    reader = csv.DictReader(StringIO(text_content))
+
+    # Нормализуем заголовки (убираем BOM, пробелы)
+    if reader.fieldnames:
+        reader.fieldnames = [f.strip().lstrip("\ufeff") for f in reader.fieldnames]
+
+    inserted = 0
+    skipped = 0
+    errors = []
+
+    for row_num, row in enumerate(reader, start=2):  # start=2 т.к. строка 1 — заголовок
+        def g(key):
+            return (row.get(key) or "").strip() or None
+
+        name    = g("name")
+        name_ru = g("name_ru")
+        name_en = g("name_en")
+
+        # Пропускаем полностью пустые строки
+        if not name and not name_ru and not name_en:
+            skipped += 1
+            continue
+
+        item_type = normalize_item_type(g("item_type") or "reagent")
+        room      = g("room")
+        cabinet   = g("cabinet")
+        shelf     = g("shelf")
+        slot      = g("slot")
+
+        try:
+            location_id = get_or_create_location(db, room, cabinet, shelf, slot)
+
+            result = db.execute(
+                text("""
+INSERT INTO items (
+    item_type, internal_code, name, name_ru, name_en,
+    formula, cas, quantity, unit, status, notes,
+    source_file, source_sheet, location_id
+) VALUES (
+    :item_type, :internal_code, :name, :name_ru, :name_en,
+    :formula, :cas, :quantity, :unit, :status, :notes,
+    :source_file, :source_sheet, :location_id
+) RETURNING id
+                """),
+                {
+                    "item_type":     item_type,
+                    "internal_code": g("code"),
+                    "name":          name,
+                    "name_ru":       name_ru,
+                    "name_en":       name_en,
+                    "formula":       g("formula"),
+                    "cas":           g("cas"),
+                    "quantity":      g("quantity"),
+                    "unit":          g("unit"),
+                    "status":        g("status"),
+                    "notes":         g("notes"),
+                    "source_file":   g("source_file"),
+                    "source_sheet":  g("source_sheet"),
+                    "location_id":   location_id,
+                },
+            ).fetchone()
+
+            item_id = result[0]
+            update_search_vector(db, item_id)
+            inserted += 1
+
+        except Exception as e:
+            db.rollback()
+            errors.append({"row": row_num, "name": name or name_ru or "—", "error": str(e)})
+            continue
+
+    if inserted > 0:
+        log_activity(db, "импорт CSV", "item", None, file.filename or "csv",
+                     f"вставлено: {inserted}, пропущено: {skipped}, ошибок: {len(errors)}")
+        db.commit()
+
+    return {
+        "ok": True,
+        "inserted": inserted,
+        "skipped": skipped,
+        "errors": errors[:50],  # не более 50 ошибок в ответе
+    }
 
 # ── Protocols CRUD ────────────────────────────────────────────────────────────
 
