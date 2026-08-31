@@ -471,7 +471,7 @@ function goMobileCatalog(tab) {
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
   else if (tab === 'experiments') { /* nothing to load */ }
-  else { state.item_type = tab; loadItems() }
+  else loadItems()
 }
 function goMobileAddChoice() {
   if (!isAdmin.value) { openLoginModal(() => { mobileScreen.value = 'addChoice' }); return }
@@ -488,13 +488,44 @@ function setTab(tab) {
   else { state.item_type = tab; loadItems() }
 }
 
-const state = reactive({ q: '', room: '', cabinet: '', item_type: 'reagent', source_file: '' })
+const reagentState = reactive({
+  q: '', room: '', cabinet: '', item_type: 'reagent', source_file: ''
+})
+
+const consumableState = reactive({
+  q: '', room: '', cabinet: '', item_type: 'consumable', source_file: ''
+})
+
+const equipmentState = reactive({
+  q: '', room: '', cabinet: '', item_type: 'equipment', source_file: ''
+})
+
+const state = computed(() => {
+  if (activeTab.value === 'equipment') return equipmentState
+  if (activeTab.value === 'consumable') return consumableState
+  return reagentState
+})
 
 const items = ref([])
 const stats = ref({ total: 0, protocols_total: 0, by_type: [], by_room: [], by_source_file: [] })
 const rooms = ref([])
 const cabinets = ref([])
-const expandedRoom = ref('')
+const reagentExpandedRoom = ref('')
+const consumableExpandedRoom = ref('')
+const equipmentExpandedRoom = ref('')
+
+const expandedRoom = computed({
+  get() {
+    if (activeTab.value === 'equipment') return equipmentExpandedRoom.value
+    if (activeTab.value === 'consumable') return consumableExpandedRoom.value
+    return reagentExpandedRoom.value
+  },
+  set(value) {
+    if (activeTab.value === 'equipment') equipmentExpandedRoom.value = value
+    else if (activeTab.value === 'consumable') consumableExpandedRoom.value = value
+    else reagentExpandedRoom.value = value
+  }
+})
 const currentLocation = ref(readStorage('currentLocation', null))
 const loading = ref(false)
 const errorMsg = ref('')
@@ -572,7 +603,7 @@ const currentTabLabel = computed(() => {
 
 async function loadItems() {
   loading.value = true; errorMsg.value = ''
-  try { const data = await api(`/api/search?${qs(state)}`); items.value = data.results || [] }
+  try { const data = await api(`/api/search?${qs(state.value)}`); items.value = data.results || [] }
   catch (e) { errorMsg.value = String(e.message || e) }
   finally { loading.value = false }
 }
@@ -636,16 +667,17 @@ function openRecentSearch(entry) {
     activeTab.value = 'protocols'; protocolQuery.value = entry.q
     if (isMobile.value) mobileScreen.value = 'catalog'; loadProtocols()
   } else {
-    activeTab.value = entry.section || 'reagent'; state.item_type = activeTab.value; state.q = entry.q
+    activeTab.value = entry.section || 'reagent'; state.value.q = entry.q
     if (isMobile.value) mobileScreen.value = 'catalog'; loadItems()
   }
 }
 let debounceTimer = null
-watch(() => ({ ...state }), () => {
+watch([reagentState, consumableState, equipmentState], () => {
   if (activeTab.value === 'protocols' || activeTab.value === 'booking' || activeTab.value === 'experiments') return
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
-    saveRecentSearch(state.q || [state.room, state.cabinet].filter(Boolean).join(' '), activeTab.value)
+    const s = state.value
+    saveRecentSearch(s.q || [s.room, s.cabinet].filter(Boolean).join(' '), activeTab.value)
     loadItems()
   }, 250)
 }, { deep: true })
