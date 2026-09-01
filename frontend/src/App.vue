@@ -707,7 +707,41 @@ const showAddModal = ref(false)
 const addSaving = ref(false)
 const addError = ref('')
 const editingItemId = ref(null)
-const showDatabaseModal = ref(false)
+// ─── CSV Import ───────────────────────────────────────────────────────────────
+const showCsvImportModal = ref(false)
+const csvImportFile = ref(null)
+const csvImporting = ref(false)
+const csvImportResult = ref(null)
+const csvImportError = ref('')
+
+function openCsvImportModal() {
+  if (!isAdmin.value) { openLoginModal(() => openCsvImportModal()); return }
+  csvImportFile.value = null
+  csvImportResult.value = null
+  csvImportError.value = ''
+  showCsvImportModal.value = true
+}
+
+async function submitCsvImport() {
+  if (!csvImportFile.value) { csvImportError.value = 'Выберите CSV-файл'; return }
+  csvImporting.value = true
+  csvImportError.value = ''
+  csvImportResult.value = null
+  try {
+    const formData = new FormData()
+    formData.append('file', csvImportFile.value)
+    const r = await fetch(`${API_BASE}/api/import/reagents-csv`, { method: 'POST', body: formData })
+    const data = await r.json()
+    if (!r.ok) throw new Error(data.detail || JSON.stringify(data))
+    csvImportResult.value = data
+    await Promise.all([loadItems(), loadStats(), loadRooms()])
+    await loadActivityLog()
+  } catch (e) {
+    csvImportError.value = String(e.message || e)
+  } finally {
+    csvImporting.value = false
+  }
+}
 
 const addForm = reactive({
   item_type: 'reagent', name: '', name_ru: '', name_en: '', formula: '', cas: '',
