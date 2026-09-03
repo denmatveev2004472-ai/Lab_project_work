@@ -12,3 +12,6 @@ package.json
 package-lock.json
 *.bak
 *.bak_*
+
+__pycache__/
+*.py[cod]
