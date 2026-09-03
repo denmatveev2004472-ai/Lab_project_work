@@ -2290,12 +2290,21 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <table>
                 <thead>
                   <tr>
-                    <th>{{ t('codeNumber') }}</th>
+                    <th>
+                      {{ t('codeNumber') }}
+                      <button v-if="activeTab === 'reagent' || activeTab === 'consumable'" class="sort-btn" @click="setSort('code')">{{ sortIcon('code') }}</button>
+                    </th>
                     <th>{{ t('name') }}</th>
                     <th v-if="activeTab === 'reagent'">{{ t('formulaCas') }}</th>
                     <th v-if="activeTab === 'equipment'">{{ t('documents') }}</th>
-                    <th>{{ t('place') }}</th>
-                    <th>{{ t('details') }}</th>
+                    <th>
+                      {{ t('place') }}
+                      <button v-if="activeTab === 'equipment' || activeTab === 'consumable'" class="sort-btn" @click="setSort('place')">{{ sortIcon('place') }}</button>
+                    </th>
+                    <th>
+                      {{ t('details') }}
+                      <button v-if="activeTab === 'reagent' || activeTab === 'consumable'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }} Кол-во</button>
+                    </th>
                     <th></th>
                   </tr>
                 </thead>
@@ -2927,6 +2936,20 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
   --shadow-lg: 0 20px 80px rgba(0,0,0,.38);
 }
 * { box-sizing: border-box; }
+.sort-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0 2px;
+  margin-left: 4px;
+  color: var(--color-text-muted);
+  vertical-align: middle;
+  opacity: 0.75;
+  transition: opacity 0.15s, color 0.15s;
+  line-height: 1;
+}
+.sort-btn:hover { opacity: 1; color: var(--color-primary); }
 html, body { min-height: 100%; margin: 0; overflow-x: hidden !important; overflow-y: auto !important; width: 100%; }
 #app { min-height: 100dvh; overflow-x: hidden; width: 100%; }
 body {
