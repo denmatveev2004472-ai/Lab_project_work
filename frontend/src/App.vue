@@ -2278,6 +2278,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                     <th></th>
                   </tr>
                 </thead>
+                
                 <tbody>
                   <tr v-for="row in sortedItems" :key="row.id">
                     <td class="mono">{{ row.code || row.inventory_number || '—' }}</td>
