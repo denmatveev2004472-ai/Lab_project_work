@@ -824,9 +824,14 @@ const sortedItems = computed(() => {
       return sortDir.value === 'asc' ? va - vb : vb - va
     }
     if (sortField.value === 'code') {
-      const va = asText(a.catalog_number || a.inventory_number || a.serial_number || '').toLowerCase()
-      const vb = asText(b.catalog_number || b.inventory_number || b.serial_number || '').toLowerCase()
-      const cmp = va.localeCompare(vb, 'ru')
+      const rawA = asText(a.catalog_number || a.inventory_number || a.serial_number || '')
+      const rawB = asText(b.catalog_number || b.inventory_number || b.serial_number || '')
+      const na = parseFloat(rawA)
+      const nb = parseFloat(rawB)
+      if (Number.isFinite(na) && Number.isFinite(nb)) {
+        return sortDir.value === 'asc' ? na - nb : nb - na
+      }
+      const cmp = rawA.toLowerCase().localeCompare(rawB.toLowerCase(), 'ru', { numeric: true })
       return sortDir.value === 'asc' ? cmp : -cmp
     }
     if (sortField.value === 'place') {
