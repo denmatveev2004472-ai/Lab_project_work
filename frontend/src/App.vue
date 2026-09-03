@@ -692,7 +692,7 @@ const showDatabaseModal = ref(false)
 
 const addForm = reactive({
   item_type: 'reagent', name: '', name_ru: '', name_en: '', formula: '', cas: '',
-  manufacturer: '', catalog_number: '', inventory_number: '', serial_number: '',
+  code: '', manufacturer: '', catalog_number: '', inventory_number: '', serial_number: '',
   quantity: '', unit: '', notes: '', document_url: '', gdrive_link: '',
   room: '', cabinet: '', shelf: '', slot: ''
 })
@@ -704,7 +704,8 @@ function createEmptyAddForm(forceType = '') {
       activeTab.value === 'consumable' ? 'consumable' : 'reagent'
     ),
     name: '', name_ru: '', name_en: '', formula: '', cas: '', manufacturer: '',
-    catalog_number: '', inventory_number: '', serial_number: '', quantity: '',
+    code: row.code || row.internal_code || '',    
+    catalog_number: row.catalog_number || '',
     unit: '', notes: '', document_url: '', gdrive_link: '', room: '', cabinet: '', shelf: '', slot: ''
   }
 }
@@ -736,6 +737,7 @@ function toPayload() {
   return {
     item_type: addForm.item_type,
     name: normalizedText(addForm.name),
+    code: normalizedText(addForm.code) || null,    
     name_ru: normalizedText(addForm.name_ru) || null,
     name_en: normalizedText(addForm.name_en) || null,
     formula: normalizedText(addForm.formula) || null,
