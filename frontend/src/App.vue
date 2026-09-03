@@ -2954,6 +2954,7 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .icon-btn:hover { background: var(--color-accent); }
 .row-actions { display: flex; gap: .3rem; }
 .row-actions-split {
+  
   justify-content: flex-start;
   gap: 1.25rem;
   margin-left: auto;
