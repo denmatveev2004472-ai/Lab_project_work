@@ -1934,7 +1934,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             <div class="toolbar-block filters-block">
               <div class="group-title">{{ t('room') }}</div>
               <div class="room-line">
-                <button v-for="r in filteredRooms"
+                <button class="room-chip" :class="{ active: state.room === '' }" @click="resetFilters">{{ t('all') }}</button>
                 <button v-for="r in filteredRooms" :key="r.room" class="room-chip" :class="{ active: expandedRoom === r.room }" @click="toggleRoom(r.room)">
                   {{ r.room }}<span class="room-chip-count">{{ r.items_count }}</span>
                 </button>
