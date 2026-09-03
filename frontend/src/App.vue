@@ -468,6 +468,10 @@ function goMobileCatalog(tab) {
   activeTab.value = tab
   sortField.value = ''
   sortDir.value = 'asc'
+  state.room = ''
+  state.cabinet = ''
+  expandedRoom.value = ''
+  cabinets.value = []
   mobileScreen.value = 'catalog'
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
@@ -484,6 +488,10 @@ function setTab(tab) {
   activeTab.value = tab
   sortField.value = ''
   sortDir.value = 'asc'
+  state.room = ''
+  state.cabinet = ''
+  expandedRoom.value = ''
+  cabinets.value = []
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
   else if (tab === 'experiments') { /* nothing to load */ }
@@ -596,7 +604,10 @@ async function loadStats() {
   try { stats.value = await api('/api/stats') } catch {}
 }
 async function loadRooms() {
-  try { rooms.value = await api('/api/rooms') } catch {}
+  try {
+    const typeParam = ['reagent', 'consumable', 'equipment'].includes(activeTab.value) ? `?item_type=${activeTab.value}` : ''
+    rooms.value = await api(`/api/rooms${typeParam}`)
+  } catch {}
 }
 async function loadCabinets(room) {
   try { cabinets.value = await api(`/api/locations/summary?room=${encodeURIComponent(room)}`) }
@@ -1890,7 +1901,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                 <div class="section-right-actions" v-if="activeTab !== 'booking' && activeTab !== 'experiments'">
                   <button v-if="isAdmin" class="btn" @click="exportCurrent('excel')">📊 Excel</button>
                   <button v-if="isAdmin" class="btn" @click="exportCurrent('word')">📄 Word</button>
-                  <button v-if="isAdmin" class="btn btn-primary" @click="activeTab === 'protocols' ? openAddProtocolModal() : openAddModal()">
+                  <button v-if="isAdmin" class="btn btn-primary" @click="activeTab === 'protocols' ? openAddProtocolModal() : openAddModal(activeTab === 'equipment' ? 'equipment' : activeTab === 'consumable' ? 'consumable' : 'reagent')">
                     + {{ t('add') }}
                   </button>
                   <button class="btn btn-database" @click="showDatabaseModal = true; loadActivityLog()">🗄️</button>
@@ -1923,7 +1934,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             <div class="toolbar-block filters-block">
               <div class="group-title">{{ t('room') }}</div>
               <div class="room-line">
-                <button class="room-chip" :class="{ active: state.room === '' }" @click="resetFilters">{{ t('all') }}</button>
+                <button v-for="r in filteredRooms"
                 <button v-for="r in filteredRooms" :key="r.room" class="room-chip" :class="{ active: expandedRoom === r.room }" @click="toggleRoom(r.room)">
                   {{ r.room }}<span class="room-chip-count">{{ r.items_count }}</span>
                 </button>
