@@ -466,6 +466,8 @@ const mobileScreen = ref('home')
 function goMobileHome() { mobileScreen.value = 'home' }
 function goMobileCatalog(tab) {
   activeTab.value = tab
+  sortField.value = ''
+  sortDir.value = 'asc'
   mobileScreen.value = 'catalog'
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
@@ -480,6 +482,8 @@ function goMobileAddChoice() {
 const activeTab = ref('reagent')
 function setTab(tab) {
   activeTab.value = tab
+  sortField.value = ''
+  sortDir.value = 'asc'
   if (tab === 'protocols') loadProtocols()
   else if (tab === 'booking') { loadBookingData() }
   else if (tab === 'experiments') { /* nothing to load */ }
@@ -790,6 +794,50 @@ async function submitAddForm() {
   finally { addSaving.value = false }
 }
 const expandedNames = ref(new Set())
+
+// ─── Сортировка ──────────────────────────────────────────────────────────────
+const sortField = ref('')
+const sortDir = ref('asc')
+
+function setSort(field) {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDir.value = 'asc'
+  }
+}
+
+function sortIcon(field) {
+  if (sortField.value !== field) return '↕'
+  return sortDir.value === 'asc' ? '↑' : '↓'
+}
+
+const sortedItems = computed(() => {
+  if (!sortField.value) return items.value
+  return [...items.value].sort((a, b) => {
+    if (sortField.value === 'quantity') {
+      const qa = parseFloat(a.quantity)
+      const qb = parseFloat(b.quantity)
+      const va = Number.isFinite(qa) ? qa : (sortDir.value === 'asc' ? Infinity : -Infinity)
+      const vb = Number.isFinite(qb) ? qb : (sortDir.value === 'asc' ? Infinity : -Infinity)
+      return sortDir.value === 'asc' ? va - vb : vb - va
+    }
+    if (sortField.value === 'code') {
+      const va = asText(a.catalog_number || a.inventory_number || a.serial_number || '').toLowerCase()
+      const vb = asText(b.catalog_number || b.inventory_number || b.serial_number || '').toLowerCase()
+      const cmp = va.localeCompare(vb, 'ru')
+      return sortDir.value === 'asc' ? cmp : -cmp
+    }
+    if (sortField.value === 'place') {
+      const va = place(a).toLowerCase()
+      const vb = place(b).toLowerCase()
+      const cmp = va.localeCompare(vb, 'ru')
+      return sortDir.value === 'asc' ? cmp : -cmp
+    }
+    return 0
+  })
+})
 function toggleNameExpand(id) {
   const next = new Set(expandedNames.value)
   if (next.has(id)) next.delete(id)
@@ -2207,17 +2255,29 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <table>
                 <thead>
                   <tr>
-                    <th>{{ t('codeNumber') }}</th>
+                    <th>
+                      {{ t('codeNumber') }}
+                      <button v-if="activeTab !== 'equipment'" class="sort-btn" @click="setSort('code')">{{ sortIcon('code') }}</button>
+                    </th>
                     <th>{{ t('name') }}</th>
-                    <th v-if="activeTab === 'reagent'">{{ t('formulaCas') }}</th>
+                    <th v-if="activeTab === 'reagent'">
+                      {{ t('formulaCas') }}
+                      <button class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
+                    </th>
                     <th v-if="activeTab === 'equipment'">{{ t('documents') }}</th>
-                    <th>{{ t('place') }}</th>
-                    <th>{{ t('details') }}</th>
+                    <th>
+                      {{ t('place') }}
+                      <button v-if="activeTab === 'equipment'" class="sort-btn" @click="setSort('place')">{{ sortIcon('place') }}</button>
+                    </th>
+                    <th>
+                      {{ t('details') }}
+                      <button v-if="activeTab === 'consumable'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
+                    </th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in items" :key="row.id">
+                  <tr v-for="row in sortedItems" :key="row.id">
                     <td class="mono">{{ row.code || row.inventory_number || '—' }}</td>
                     <td>
   <div class="name-cell">
@@ -2942,6 +3002,20 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
 .simple-toolbar { padding-top: 0; }
 .section-title { font-family: var(--font-display); font-size: var(--text-lg); }
 .table-wrap { overflow-x: auto; border-radius: 1rem; max-width: 100%; }
+.sort-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 0 2px;
+  margin-left: 3px;
+  color: var(--color-text-muted, #888);
+  vertical-align: middle;
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s;
+}
+.sort-btn:hover { opacity: 1; color: var(--color-primary, #01696f); }
+
 table { width: 100%; border-collapse: collapse; }
 thead th { position: sticky; top: 0; background: var(--color-surface-2); backdrop-filter: blur(10px); font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); text-align: left; padding: 1rem; border-bottom: 1px solid var(--color-border); }
 tbody td { padding: 1rem; border-bottom: 1px solid rgba(141,164,177,.12); vertical-align: top; }
@@ -2954,7 +3028,7 @@ tbody tr:hover { background: rgba(84,193,195,.06); }
 .icon-btn:hover { background: var(--color-accent); }
 .row-actions { display: flex; gap: .3rem; }
 .row-actions-split {
-  
+
   justify-content: flex-start;
   gap: 1.25rem;
   margin-left: auto;
