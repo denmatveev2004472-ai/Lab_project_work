@@ -2260,10 +2260,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                       <button v-if="activeTab !== 'equipment'" class="sort-btn" @click="setSort('code')">{{ sortIcon('code') }}</button>
                     </th>
                     <th>{{ t('name') }}</th>
-                    <th v-if="activeTab === 'reagent'">
-                      {{ t('formulaCas') }}
-                      <button class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
-                    </th>
+                    <th v-if="activeTab === 'reagent'">{{ t('formulaCas') }}</th>
                     <th v-if="activeTab === 'equipment'">{{ t('documents') }}</th>
                     <th>
                       {{ t('place') }}
@@ -2271,7 +2268,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                     </th>
                     <th>
                       {{ t('details') }}
-                      <button v-if="activeTab === 'consumable'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
+                      <button v-if="activeTab === 'consumable' || activeTab === 'reagent'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
                     </th>
                     <th></th>
                   </tr>
