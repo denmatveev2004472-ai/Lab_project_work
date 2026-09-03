@@ -2519,6 +2519,10 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             </select>
           </div>
           <div class="form-row">
+            <label>{{ t('codeNumber') }}</label>
+            <input v-model="addForm.code" type="text" placeholder="Например: 3.14" />
+          </div>
+          <div class="form-row">
             <label>{{ t('nameRequired') }}</label>
             <input v-model="addForm.name" type="text" placeholder="Например: Натрия хлорид" />
           </div>
