@@ -704,8 +704,8 @@ function createEmptyAddForm(forceType = '') {
       activeTab.value === 'consumable' ? 'consumable' : 'reagent'
     ),
     name: '', name_ru: '', name_en: '', formula: '', cas: '', manufacturer: '',
-    code: row.code || row.internal_code || '',    
-    catalog_number: row.catalog_number || '',
+    catalog_number: '', inventory_number: '', serial_number: '',
+    quantity: '',
     unit: '', notes: '', document_url: '', gdrive_link: '', room: '', cabinet: '', shelf: '', slot: ''
   }
 }
@@ -2312,7 +2312,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
 
                 <tbody>
                   <tr v-for="row in sortedItems" :key="row.id">
-                    <td class="mono">{{ row.code || row.inventory_number || '—' }}</td>
+                    <td class="mono">{{ row.code || row.catalog_number || row.inventory_number || row.serial_number || '—' }}</td>
                     <td>
   <div class="name-cell">
     <div class="name-line">
