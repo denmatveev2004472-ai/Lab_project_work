@@ -2334,7 +2334,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                 </div>
               </div>
               <div class="mobile-item-list">
-                <div v-for="row in items" :key="row.id" class="mobile-item-card">
+                <div v-for="row in sortedItems" :key="row.id" class="mobile-item-card">
                   <div class="mobile-item-top">
                     <div class="name-cell">
   <strong class="mobile-item-name" :class="{ 'name-truncate': !expandedNames.has(row.id) && isLongName(row) }">{{ row.name || row.name_ru || row.name_en || t('noName') }}</strong>
@@ -3015,7 +3015,13 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
   transition: opacity 0.15s, color 0.15s;
 }
 .sort-btn:hover { opacity: 1; color: var(--color-primary, #01696f); }
-
+.sort-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 0.75rem; padding: 0 3px; margin-left: 4px;
+  color: var(--color-text-muted, #888); vertical-align: middle;
+  transition: color 0.15s;
+}
+.sort-btn:hover { color: var(--color-primary, #01696f); }
 table { width: 100%; border-collapse: collapse; }
 thead th { position: sticky; top: 0; background: var(--color-surface-2); backdrop-filter: blur(10px); font-size: var(--text-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); text-align: left; padding: 1rem; border-bottom: 1px solid var(--color-border); }
 tbody td { padding: 1rem; border-bottom: 1px solid rgba(141,164,177,.12); vertical-align: top; }
