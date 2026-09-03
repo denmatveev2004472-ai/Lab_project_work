@@ -479,14 +479,18 @@ ORDER BY room
     }
 
 @app.get("/api/rooms")
-def rooms(db: Session = Depends(get_db)):
-    rows = db.execute(text("""
+def rooms(item_type: str = Query(default=""), db: Session = Depends(get_db)):
+    params = {"item_type": item_type}
+    where = "AND i.item_type = :item_type" if item_type else ""
+    rows = db.execute(text(f"""
 SELECT l.room, COUNT(i.id) AS items_count
 FROM locations l
 LEFT JOIN items i ON i.location_id = l.id
+WHERE 1=1 {where}
 GROUP BY l.room
+HAVING COUNT(i.id) > 0
 ORDER BY l.room
-    """)).fetchall()
+    """), params).fetchall()
     return [dict(r._mapping) for r in rows]
 
 @app.get("/api/locations/summary")
