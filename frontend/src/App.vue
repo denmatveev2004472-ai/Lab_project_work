@@ -824,8 +824,8 @@ const sortedItems = computed(() => {
       return sortDir.value === 'asc' ? va - vb : vb - va
     }
     if (sortField.value === 'code') {
-      const rawA = asText(a.catalog_number || a.inventory_number || a.serial_number || '')
-      const rawB = asText(b.catalog_number || b.inventory_number || b.serial_number || '')
+      const rawA = asText(a.code || a.catalog_number || a.inventory_number || a.serial_number || '')
+      const rawB = asText(b.code || b.catalog_number || b.inventory_number || b.serial_number || '')
       // Парсим коды вида "1.14", "X.1", "310-R2" как составные: prefix + number
       function parseCode(s) {
         const m = s.match(/^([A-Za-zА-Яа-я]*)\.?(\d+(?:\.\d+)?)/)
