@@ -826,12 +826,19 @@ const sortedItems = computed(() => {
     if (sortField.value === 'code') {
       const rawA = asText(a.catalog_number || a.inventory_number || a.serial_number || '')
       const rawB = asText(b.catalog_number || b.inventory_number || b.serial_number || '')
-      const na = parseFloat(rawA)
-      const nb = parseFloat(rawB)
-      if (Number.isFinite(na) && Number.isFinite(nb)) {
-        return sortDir.value === 'asc' ? na - nb : nb - na
+      // Парсим коды вида "1.14", "X.1", "310-R2" как составные: prefix + number
+      function parseCode(s) {
+        const m = s.match(/^([A-Za-zА-Яа-я]*)\.?(\d+(?:\.\d+)?)/)
+        if (m) return { prefix: m[1] || '', num: parseFloat(m[2]) }
+        return { prefix: s, num: 0 }
       }
-      const cmp = rawA.localeCompare(rawB, 'ru', { numeric: true, sensitivity: 'base' })
+      const ca = parseCode(rawA)
+      const cb = parseCode(rawB)
+      if (ca.prefix === cb.prefix) {
+        const diff = ca.num - cb.num
+        return sortDir.value === 'asc' ? diff : -diff
+      }
+      const cmp = ca.prefix.localeCompare(cb.prefix, 'ru')
       return sortDir.value === 'asc' ? cmp : -cmp
     }
     if (sortField.value === 'place') {
@@ -2250,7 +2257,21 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
           <!-- ═══ TABLE CARD (reagents, equipment, consumables) ═══ -->
           <section v-else-if="activeTab !== 'protocols'" class="table-card">
             <div class="table-toolbar simple-toolbar">
-              <div><div class="section-title">{{ currentTabLabel }}</div></div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div class="section-title">{{ currentTabLabel }}</div>
+                <template v-if="activeTab === 'reagent'">
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код {{ sortIcon('code') }}</button>
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'quantity' }" @click="setSort('quantity')">Кол-во {{ sortIcon('quantity') }}</button>
+                </template>
+                <template v-else-if="activeTab === 'consumable'">
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код {{ sortIcon('code') }}</button>
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'place' }" @click="setSort('place')">Место {{ sortIcon('place') }}</button>
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'quantity' }" @click="setSort('quantity')">Кол-во {{ sortIcon('quantity') }}</button>
+                </template>
+                <template v-else-if="activeTab === 'equipment'">
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'place' }" @click="setSort('place')">Место {{ sortIcon('place') }}</button>
+                </template>
+              </div>
             </div>
             <div v-if="loading" class="muted">{{ t('loading') }}</div>
             <div v-else-if="errorMsg" class="muted">{{ errorMsg }}</div>
@@ -2262,19 +2283,15 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                   <tr>
                     <th>
                       {{ t('codeNumber') }}
-                      <button v-if="activeTab !== 'equipment'" class="sort-btn" @click="setSort('code')">{{ sortIcon('code') }}</button>
-                      <button v-if="activeTab === 'reagent'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
                     </th>
                     <th>{{ t('name') }}</th>
                     <th v-if="activeTab === 'reagent'">{{ t('formulaCas') }}</th>
                     <th v-if="activeTab === 'equipment'">{{ t('documents') }}</th>
                     <th>
                       {{ t('place') }}
-                      <button v-if="activeTab === 'equipment' || activeTab === 'consumable'" class="sort-btn" @click="setSort('place')">{{ sortIcon('place') }}</button>
                     </th>
                     <th>
                       {{ t('details') }}
-                      <button v-if="activeTab === 'consumable'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
                     </th>
                     <th></th>
                   </tr>
@@ -3006,6 +3023,30 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
 .simple-toolbar { padding-top: 0; }
 .section-title { font-family: var(--font-display); font-size: var(--text-lg); }
 .table-wrap { overflow-x: auto; border-radius: 1rem; max-width: 100%; }
+.sort-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 10px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-surface, #fff);
+  color: var(--color-text-muted, #888);
+  font-size: var(--text-xs, 0.75rem);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.sort-btn-pill:hover {
+  border-color: var(--color-primary, #01696f);
+  color: var(--color-primary, #01696f);
+}
+.sort-btn-pill.active {
+  background: var(--color-primary-highlight, #cedcd8);
+  border-color: var(--color-primary, #01696f);
+  color: var(--color-primary, #01696f);
+  font-weight: 600;
+}
 .sort-btn {
   background: none;
   border: none;
