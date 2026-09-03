@@ -2279,11 +2279,11 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <div class="section-title">{{ currentTabLabel }}</div>
                 <template v-if="activeTab === 'reagent'">
-                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код {{ sortIcon('code') }}</button>
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код / № {{ sortIcon('code') }}</button>
                   <button class="sort-btn-pill" :class="{ active: sortField === 'quantity' }" @click="setSort('quantity')">Кол-во {{ sortIcon('quantity') }}</button>
                 </template>
                 <template v-else-if="activeTab === 'consumable'">
-                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код {{ sortIcon('code') }}</button>
+                  <button class="sort-btn-pill" :class="{ active: sortField === 'code' }" @click="setSort('code')">Код / № {{ sortIcon('code') }}</button>
                   <button class="sort-btn-pill" :class="{ active: sortField === 'place' }" @click="setSort('place')">Место {{ sortIcon('place') }}</button>
                   <button class="sort-btn-pill" :class="{ active: sortField === 'quantity' }" @click="setSort('quantity')">Кол-во {{ sortIcon('quantity') }}</button>
                 </template>
