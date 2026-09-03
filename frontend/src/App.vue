@@ -706,6 +706,7 @@ function createEmptyAddForm(forceType = '') {
     name: '', name_ru: '', name_en: '', formula: '', cas: '', manufacturer: '',
     catalog_number: '', inventory_number: '', serial_number: '',
     quantity: '',
+    code: '',
     unit: '', notes: '', document_url: '', gdrive_link: '', room: '', cabinet: '', shelf: '', slot: ''
   }
 }
@@ -721,6 +722,7 @@ function openEditModal(row) {
   Object.assign(addForm, {
     item_type: row.item_type || 'reagent', name: row.name || '', name_ru: row.name_ru || '',
     name_en: row.name_en || '', formula: row.formula || '', cas: row.cas || '',
+    code: row.code || row.internal_code || '',
     manufacturer: row.manufacturer || '', catalog_number: row.catalog_number || '',
     inventory_number: row.inventory_number || '', serial_number: row.serial_number || '',
     quantity: row.quantity ?? '', unit: row.unit || '', notes: row.notes || '',
