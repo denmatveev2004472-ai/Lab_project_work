@@ -11,6 +11,7 @@ while ($true) {
         & git -C $folder add -A
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         & git -C $folder commit -m "auto: $timestamp"
+        & git -C $folder pull origin main --rebase
         & git -C $folder push origin main
         Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Pushed changes"
     }
