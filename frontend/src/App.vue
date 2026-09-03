@@ -455,6 +455,7 @@ const isMobile = ref(window.innerWidth <= 900)
 function updateIsMobile() {
   isMobile.value = window.innerWidth <= 900
 }
+
 window.addEventListener('resize', updateIsMobile)
 window.addEventListener('orientationchange', updateIsMobile)
 onUnmounted(() => {
