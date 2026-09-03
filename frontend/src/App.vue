@@ -2263,22 +2263,23 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                     <th>
                       {{ t('codeNumber') }}
                       <button v-if="activeTab !== 'equipment'" class="sort-btn" @click="setSort('code')">{{ sortIcon('code') }}</button>
+                      <button v-if="activeTab === 'reagent'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
                     </th>
                     <th>{{ t('name') }}</th>
                     <th v-if="activeTab === 'reagent'">{{ t('formulaCas') }}</th>
                     <th v-if="activeTab === 'equipment'">{{ t('documents') }}</th>
                     <th>
                       {{ t('place') }}
-                      <button v-if="activeTab === 'equipment'" class="sort-btn" @click="setSort('place')">{{ sortIcon('place') }}</button>
+                      <button v-if="activeTab === 'equipment' || activeTab === 'consumable'" class="sort-btn" @click="setSort('place')">{{ sortIcon('place') }}</button>
                     </th>
                     <th>
                       {{ t('details') }}
-                      <button v-if="activeTab === 'consumable' || activeTab === 'reagent'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
+                      <button v-if="activeTab === 'consumable'" class="sort-btn" @click="setSort('quantity')">{{ sortIcon('quantity') }}</button>
                     </th>
                     <th></th>
                   </tr>
                 </thead>
-                
+
                 <tbody>
                   <tr v-for="row in sortedItems" :key="row.id">
                     <td class="mono">{{ row.code || row.inventory_number || '—' }}</td>
