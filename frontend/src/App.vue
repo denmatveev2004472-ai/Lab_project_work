@@ -196,6 +196,8 @@ const i18n = {
     instrOptMicro: 'Оптический микроскоп',
     instrConfocal: 'Конфокальный микроскоп',
     instrBeNano: 'Динамическое светорассеяние (BeNano)',
+    instrLyophil: 'Лиофильная сушка',
+    instrVacuum: 'Вакууматор',
     noBookings: 'Записей нет — нажмите «Забронировать»',
     bookingYou: 'Вы',
     dur30: '30 мин',
@@ -386,6 +388,8 @@ const i18n = {
     instrOptMicro: 'Optical Microscope',
     instrConfocal: 'Confocal Microscope',
     instrBeNano: 'Dynamic Light Scattering (BeNano)',
+    instrLyophil: 'Freeze Dryer (Lyophilizer)',
+    instrVacuum: 'Vacuum Sealer',
     noBookings: 'No bookings yet — click "Book"',
     bookingYou: 'You',
     dur30: '30 min',
@@ -971,6 +975,75 @@ function exportCurrent(format) {
 
 const filteredSiteUpdates = computed(() => siteUpdates.value.slice(0, 100))
 
+// ─── Управление приборами (добавление/редактирование) ───────────────────────
+const showAddInstrModal = ref(false)
+const editingInstrId = ref(null)
+const instrFormError = ref('')
+const instrForm = reactive({
+  icon: '', labelRu: '', labelEn: '', searchNamesRaw: '',
+  protocol: '', postprocess: '', imagesRaw: '', articlesRaw: ''
+})
+
+function openAddInstrModal(instr = null) {
+  if (!isAdmin.value) { openLoginModal(() => openAddInstrModal(instr)); return }
+  instrFormError.value = ''
+  if (instr) {
+    editingInstrId.value = instr.id
+    const info = INSTR_INFO[instr.id] || {}
+    Object.assign(instrForm, {
+      icon: instr.icon || '',
+      labelRu: i18n.ru[instr.labelKey] || '',
+      labelEn: i18n.en[instr.labelKey] || '',
+      searchNamesRaw: (instr.searchNames || []).join(', '),
+      protocol: info.protocol || '',
+      postprocess: info.postprocess || '',
+      imagesRaw: (info.images || []).join('\n'),
+      articlesRaw: (info.articles || []).join('\n')
+    })
+  } else {
+    editingInstrId.value = null
+    Object.assign(instrForm, { icon: '', labelRu: '', labelEn: '', searchNamesRaw: '', protocol: '', postprocess: '', imagesRaw: '', articlesRaw: '' })
+  }
+  showAddInstrModal.value = true
+}
+
+function closeAddInstrModal() {
+  showAddInstrModal.value = false
+  editingInstrId.value = null
+}
+
+function submitInstrForm() {
+  if (!instrForm.labelRu.trim()) { instrFormError.value = 'Укажите название'; return }
+  const id = editingInstrId.value || ('custom_' + Date.now())
+  const labelKey = editingInstrId.value
+    ? INSTRUMENTS.find(i => i.id === editingInstrId.value)?.labelKey || id
+    : id
+  const searchNames = instrForm.searchNamesRaw.split(',').map(s => s.trim()).filter(Boolean)
+
+  if (!editingInstrId.value) {
+    INSTRUMENTS.push({ id, labelKey, icon: instrForm.icon || '🔧', searchNames })
+    i18n.ru[labelKey] = instrForm.labelRu
+    i18n.en[labelKey] = instrForm.labelEn || instrForm.labelRu
+  } else {
+    const idx = INSTRUMENTS.findIndex(i => i.id === editingInstrId.value)
+    if (idx !== -1) {
+      INSTRUMENTS[idx].icon = instrForm.icon || INSTRUMENTS[idx].icon
+      INSTRUMENTS[idx].searchNames = searchNames
+      i18n.ru[labelKey] = instrForm.labelRu
+      i18n.en[labelKey] = instrForm.labelEn || instrForm.labelRu
+    }
+  }
+
+  INSTR_INFO[id] = {
+    protocol: instrForm.protocol,
+    postprocess: instrForm.postprocess,
+    images: instrForm.imagesRaw.split('\n').map(s => s.trim()).filter(Boolean),
+    articles: instrForm.articlesRaw.split('\n').map(s => s.trim()).filter(Boolean)
+  }
+
+  closeAddInstrModal()
+}
+
 // ─── BOOKING MODULE ───────────────────────────────────────────────────────────
 
 const INSTRUMENTS = [
@@ -980,6 +1053,8 @@ const INSTRUMENTS = [
   { id: 'opt',      labelKey: 'instrOptMicro', icon: '🔬', searchNames: ['оптический', 'микроскоп'] },
   { id: 'confocal', labelKey: 'instrConfocal', icon: '🔭', searchNames: ['конфокальный', 'confocal'] },
   { id: 'benano',   labelKey: 'instrBeNano',   icon: '⚗️', searchNames: ['BeNano', 'zeta'] },
+  { id: 'lyophil',  labelKey: 'instrLyophil',  icon: '❄️', searchNames: ['Лиофильная', 'лиофил', 'lyophil', 'freeze dry'] },
+  { id: 'vacuum',   labelKey: 'instrVacuum',   icon: '💨', searchNames: ['Вакууматор', 'вакуум', 'vacuum sealer'] },
 ]
 
 const DURATIONS = [
@@ -1020,6 +1095,16 @@ const INSTR_INFO = {
     protocol: 'Подготовка аналогична DLS (см. выше). BeNano поддерживает одновременное измерение DLS + ELS (зета-потенциал). Для зета-потенциала используйте кювету с электродами. Ионная сила буфера должна быть ≤ 50 мМ.',
     postprocess: 'Экспортируйте отчёт PDF + исходные данные. Сравните Z-average и PDI со стандартными DLS (при наличии). Зета-потенциал > ±30 мВ — коллоидно стабильная система.',
     articles: ['DOI: 10.1016/j.ijpharm.2022.xxxxx']
+  },
+  lyophil: {
+    protocol: 'Перед запуском: убедитесь, что конденсатор охлаждён до −40°C (ждать ~30 мин). Поместите замороженные образцы (предварительно заморозьте при −80°C или в жидком азоте). Установите лотки, закройте камеру и включите вакуум. Типичный цикл: 12–48 ч при давлении < 0.1 мбар. После завершения — плавно стравите вакуум, извлеките образцы.',
+    postprocess: 'Взвесьте образцы до и после лиофилизации для расчёта потери воды. Проверьте внешний вид (однородный, без коллапса). Храните в герметичных контейнерах с силикагелем.',
+    articles: ['DOI: 10.1016/j.ejpb.2020.xxxxx', 'DOI: 10.1021/mp200xxxxc']
+  },
+  vacuum: {
+    protocol: 'Перед запуском: проверьте уровень масла в насосе (при наличии). Убедитесь, что уплотнения камеры чистые и без повреждений. Поместите образец, закройте крышку. Включите насос и контролируйте показания вакуумметра. Не превышайте максимально допустимое давление камеры.',
+    postprocess: 'Запишите остаточное давление и время выхода на режим. При обнаружении утечек — проверьте уплотнения и соединения. Журнал работы ведётся в журнале оборудования лаборатории.',
+    articles: []
   }
 }
 
@@ -2732,6 +2817,12 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
     </div>
 
     <!-- Instrument Info Modal -->
+     <!-- Кнопка добавить новый прибор — только для админа -->
+<div v-if="isAdmin" class="add-instr-btn-wrap">
+  <button class="btn-add-instr" @click="openAddInstrModal">
+    ➕ {{ language === 'ru' ? 'Добавить прибор' : 'Add instrument' }}
+  </button>
+</div>    
     <div v-if="showInstrInfoModal" class="modal-overlay" @click.self="closeInstrInfoModal">
       <div class="modal-card modal-card-info">
         <div class="modal-header">
@@ -2749,6 +2840,15 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
           </div>
 
           <div v-if="bookingInfoTab === 'protocol'" class="info-content">
+            <div v-if="(INSTR_INFO[selectedInstrId]?.images || []).length" class="instr-images">
+  <img
+    v-for="(img, idx) in INSTR_INFO[selectedInstrId].images"
+    :key="idx"
+    :src="img"
+    :alt="'Изображение ' + (idx+1)"
+    class="instr-protocol-img"
+  />
+</div>
             <div class="info-hint">Следуйте этому протоколу при работе с прибором. Если у вас есть вопросы — обратитесь к ответственному за прибор или администратору лаборатории.</div>
             <pre class="info-text">{{ selectedInstrInfo.protocol || 'Протокол будет добавлен позже.' }}</pre>
           </div>
@@ -2902,6 +3002,46 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
       </div>
     </div>
   </div>
+  <!-- ═══ МОДАЛ: Добавить/редактировать прибор ══════════════════════════════ -->
+<div v-if="showAddInstrModal" class="modal-overlay" @click.self="closeAddInstrModal">
+  <div class="modal-box modal-instr-edit">
+    <div class="modal-header">
+      <span>{{ editingInstrId ? '✏️ Редактировать прибор' : '➕ Добавить прибор' }}</span>
+      <button class="modal-close" @click="closeAddInstrModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>Иконка (эмодзи)
+        <input v-model="instrForm.icon" maxlength="4" placeholder="📡" />
+      </label>
+      <label>Название (RU) *
+        <input v-model="instrForm.labelRu" placeholder="Лиофильная сушка" />
+      </label>
+      <label>Название (EN)
+        <input v-model="instrForm.labelEn" placeholder="Freeze Dryer" />
+      </label>
+      <label>Ключевые слова для поиска (через запятую)
+        <input v-model="instrForm.searchNamesRaw" placeholder="Лиофильная, lyophil, freeze dry" />
+      </label>
+      <label>Протокол эксплуатации
+        <textarea v-model="instrForm.protocol" rows="5" placeholder="Шаги работы с прибором..."></textarea>
+      </label>
+      <label>Обработка результатов
+        <textarea v-model="instrForm.postprocess" rows="3" placeholder="Как обрабатывать данные..."></textarea>
+      </label>
+      <label>Изображения (ссылки, по одной на строку)
+        <textarea v-model="instrForm.imagesRaw" rows="3" placeholder="https://...&#10;https://..."></textarea>
+      </label>
+      <label>Примеры статей (DOI/ссылки, по одной на строку)
+        <textarea v-model="instrForm.articlesRaw" rows="3" placeholder="DOI: 10.xxxx/xxxxx"></textarea>
+      </label>
+      <div v-if="instrFormError" class="form-error">{{ instrFormError }}</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" @click="closeAddInstrModal">Отмена</button>
+      <button class="btn-primary" @click="submitInstrForm">💾 Сохранить</button>
+    </div>
+  </div>
+</div>
 </template>
 
 <style>
@@ -3070,6 +3210,27 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
   color: var(--color-primary, #01696f);
   font-weight: 600;
 }
+.instr-protocol-img {
+  max-width: 100%;
+  border-radius: var(--radius-md, 8px);
+  margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+.instr-images { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.add-instr-btn-wrap { padding: 8px 0 4px; }
+.btn-add-instr {
+  background: none;
+  border: 1.5px dashed var(--color-primary, #01696f);
+  color: var(--color-primary, #01696f);
+  border-radius: var(--radius-md, 8px);
+  padding: 7px 18px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+}
+.btn-add-instr:hover { background: var(--color-primary-highlight, #cedcd8); }
+.modal-instr-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--color-text-muted, #888); margin-bottom: 10px; }
+.modal-instr-edit input, .modal-instr-edit textarea { font-size: 0.95rem; padding: 6px 10px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--color-border, #ccc); background: var(--color-surface, #fff); color: var(--color-text); }
 .sort-btn {
   background: none;
   border: none;
