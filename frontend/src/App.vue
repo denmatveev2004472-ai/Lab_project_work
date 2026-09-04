@@ -3008,7 +3008,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
       <button class="btn" @click="closeAddInstrModal">{{ t('cancel') }}</button>
       <button class="btn btn-primary" @click="submitInstrForm">{{ t('save') }}</button>
     </div>
-    <div class="modal-body"></div>  
+    <div class="modal-body">  
       <label>Иконка (эмодзи)
         <input v-model="instrForm.icon" maxlength="4" placeholder="📡" />
       </label>
