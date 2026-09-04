@@ -3251,6 +3251,30 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
   border-color: var(--color-primary, #01696f);
 }
 
+.sort-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sort-btn-pill:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sort-btn-pill.active {
+  background: var(--accent-bg, #e0f2f1);
+  color: var(--accent, #01696f);
+  border-color: var(--accent, #01696f);
+  font-weight: 600;
+}
 .sort-btn {
   background: none;
   border: none;
@@ -3264,6 +3288,30 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
   transition: opacity 0.15s, color 0.15s;
 }
 .sort-btn:hover { opacity: 1; color: var(--color-primary, #01696f); }
+.sort-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sort-btn-pill:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sort-btn-pill.active {
+  background: var(--accent-bg, #e0f2f1);
+  color: var(--accent, #01696f);
+  border-color: var(--accent, #01696f);
+  font-weight: 600;
+}
 .sort-btn {
   background: none; border: none; cursor: pointer;
   font-size: 0.75rem; padding: 0 3px; margin-left: 4px;
@@ -3271,6 +3319,30 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
   transition: color 0.15s;
 }
 .sort-btn:hover { color: var(--color-primary, #01696f); }
+.sort-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sort-btn-pill:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sort-btn-pill.active {
+  background: var(--accent-bg, #e0f2f1);
+  color: var(--accent, #01696f);
+  border-color: var(--accent, #01696f);
+  font-weight: 600;
+}
 .sort-btn {
   background: none;
   border: none;
