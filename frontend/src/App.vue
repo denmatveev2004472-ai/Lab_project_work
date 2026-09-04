@@ -3031,10 +3031,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
       </label>
       <div v-if="instrFormError" class="form-error">{{ instrFormError }}</div>
     </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" @click="closeAddInstrModal">Отмена</button>
-      <button class="btn-primary" @click="submitInstrForm">💾 Сохранить</button>
-    </div>
+    
   </div>
 </div>
 </template>
