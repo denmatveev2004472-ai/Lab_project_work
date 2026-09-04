@@ -3226,6 +3226,31 @@ input[type="search"] { flex: 1; min-width: 0; padding: 1rem 1.1rem; border-radiu
 .btn-add-instr:hover { background: var(--color-primary-highlight, #cedcd8); }
 .modal-instr-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--color-text-muted, #888); margin-bottom: 10px; }
 .modal-instr-edit input, .modal-instr-edit textarea { font-size: 0.95rem; padding: 6px 10px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--color-border, #ccc); background: var(--color-surface, #fff); color: var(--color-text); }
+.sort-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #d4d1ca);
+  background: var(--color-surface, #f9f8f5);
+  color: var(--color-text-muted, #7a7974);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sort-btn-pill:hover {
+  background: var(--color-primary-highlight, #cedcd8);
+  color: var(--color-primary, #01696f);
+  border-color: var(--color-primary, #01696f);
+}
+.sort-btn-pill.active {
+  background: var(--color-primary, #01696f);
+  color: #fff;
+  border-color: var(--color-primary, #01696f);
+}
+
 .sort-btn {
   background: none;
   border: none;
