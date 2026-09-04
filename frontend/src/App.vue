@@ -2114,6 +2114,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <div class="booking-header-actions">
                 <button class="btn" @click="openInstrInfoModal(selectedInstrId)">📋 {{ t('bookingOperProtocol') }}</button>
                 <button v-if="isAdmin" class="btn btn-admin-status" @click="openAdminStatusModal(selectedInstrId)">🔧 {{ t('bookingSetStatus') }}</button>
+                <button v-if="isAdmin" class="btn" @click="openAddInstrModal()">➕ {{ language === 'ru' ? 'Добавить прибор' : 'Add instrument' }}</button>
               </div>
             </div>
 
@@ -2817,12 +2818,6 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
     </div>
 
     <!-- Instrument Info Modal -->
-     <!-- Кнопка добавить новый прибор — только для админа -->
-<div v-if="isAdmin" class="add-instr-btn-wrap">
-  <button class="btn-add-instr" @click="openAddInstrModal">
-    ➕ {{ language === 'ru' ? 'Добавить прибор' : 'Add instrument' }}
-  </button>
-</div>    
     <div v-if="showInstrInfoModal" class="modal-overlay" @click.self="closeInstrInfoModal">
       <div class="modal-card modal-card-info">
         <div class="modal-header">
