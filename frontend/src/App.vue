@@ -2998,13 +2998,17 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
     </div>
   </div>
   <!-- ═══ МОДАЛ: Добавить/редактировать прибор ══════════════════════════════ -->
-<div v-if="showAddInstrModal" class="modal-overlay" @click.self="closeAddInstrModal">
-  <div class="modal-box modal-instr-edit">
+<div v-if="showAddInstrModal" class="modal-overlay modal-overlay-mobile-safe" @click.self="closeAddInstrModal">
+  <div class="modal-card modal-card-mobile-safe">
     <div class="modal-header">
-      <span>{{ editingInstrId ? '✏️ Редактировать прибор' : '➕ Добавить прибор' }}</span>
+      <h3>{{ editingInstrId ? (language === 'ru' ? 'Редактировать прибор' : 'Edit instrument') : (language === 'ru' ? 'Добавить прибор' : 'Add instrument') }}</h3>      
       <button class="modal-close" @click="closeAddInstrModal">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-footer-top modal-footer-top-mobile-safe">
+      <button class="btn" @click="closeAddInstrModal">{{ t('cancel') }}</button>
+      <button class="btn btn-primary" @click="submitInstrForm">{{ t('save') }}</button>
+    </div>
+    <div class="modal-body"></div>  
       <label>Иконка (эмодзи)
         <input v-model="instrForm.icon" maxlength="4" placeholder="📡" />
       </label>
