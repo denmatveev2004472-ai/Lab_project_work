@@ -1617,7 +1617,7 @@ const cellBookingSaving = ref(false)
 
 async function loadCellBookings() {
   try {
-    const offset = cellBookingWeek.value
+    const offset = cellBookingWeekOffset.value
     const data = await api(`/api/cell-usage?period=week&offset=${offset}`)
     cellBookings.value = (data.results || []).map(u => {
       const start = new Date(u.start_time)
