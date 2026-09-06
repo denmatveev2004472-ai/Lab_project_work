@@ -2,8 +2,9 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
 
-const API_BASE = import.meta.env.DEV ? 'http://192.168.3.56:8000' : window.location.origin
-
+const API_BASE = import.meta.env.DEV
+  ? `${window.location.protocol}//${window.location.hostname}:8000`
+  : window.location.origin
 async function api(url, options) {
   const r = await fetch(`${API_BASE}${url}`, options)
   if (!r.ok) throw new Error(await r.text())
