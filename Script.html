@@ -1,0 +1,217 @@
+<script>
+  const state = { cursor: new Date(), events: [] };
+  const $ = id => document.getElementById(id);
+  const monthLabel = $('monthLabel');
+  const grid = $('calendarGrid');
+  const dialog = $('eventDialog');
+  const form = $('eventForm');
+  const loading = $('loading');
+  const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
+  const timeFormatter = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    $('previousButton').addEventListener('click', () => moveMonth(-1));
+    $('nextButton').addEventListener('click', () => moveMonth(1));
+    $('todayButton').addEventListener('click', () => {
+      state.cursor = new Date();
+      loadEvents();
+    });
+    $('newEventButton').addEventListener('click', () => openEventDialog());
+    $('closeDialogButton').addEventListener('click', closeDialog);
+    $('cancelButton').addEventListener('click', closeDialog);
+    $('deleteEventButton').addEventListener('click', removeEvent);
+    $('eventAllDay').addEventListener('change', toggleAllDay);
+    form.addEventListener('submit', saveEvent);
+    loadEvents();
+  });
+
+  function moveMonth(delta) {
+    state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() + delta, 1);
+    loadEvents();
+  }
+
+  function loadEvents() {
+    const range = visibleRange();
+    setLoading(true);
+
+    google.script.run
+      .withSuccessHandler(events => {
+        state.events = events;
+        renderCalendar();
+        setLoading(false);
+      })
+      .withFailureHandler(showError)
+      .getEvents(range.start.toISOString(), range.end.toISOString());
+  }
+
+  function visibleRange() {
+    const first = new Date(state.cursor.getFullYear(), state.cursor.getMonth(), 1);
+    const start = new Date(first);
+    start.setDate(first.getDate() - ((first.getDay() + 6) % 7));
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 42);
+
+    return { start, end };
+  }
+
+  function renderCalendar() {
+    const range = visibleRange();
+    monthLabel.textContent = monthFormatter.format(state.cursor);
+    grid.innerHTML = '';
+
+    for (let index = 0; index < 42; index += 1) {
+      const date = new Date(range.start);
+      date.setDate(range.start.getDate() + index);
+
+      const outside = date.getMonth() !== state.cursor.getMonth();
+      const weekend = date.getDay() === 0 || date.getDay() === 6;
+      const cell = document.createElement('article');
+
+      cell.className = `day${outside ? ' outside' : ''}${weekend ? ' weekend' : ''}${sameDay(date, new Date()) ? ' today' : ''}`;
+      cell.innerHTML = `<span class="day-number">${date.getDate()}</span><div class="events"></div>`;
+      cell.addEventListener('click', () => openEventDialog(null, date));
+
+      const events = eventsForDate(date);
+      const container = cell.querySelector('.events');
+      events.slice(0, 3).forEach(event => container.appendChild(eventElement(event)));
+
+      if (events.length > 3) {
+        const more = document.createElement('span');
+        more.className = 'event-more';
+        more.textContent = `ещё ${events.length - 3}`;
+        container.appendChild(more);
+      }
+
+      grid.appendChild(cell);
+    }
+  }
+
+  function eventsForDate(date) {
+    return state.events.filter(event => sameDay(new Date(event.start), date));
+  }
+
+  function eventElement(event) {
+    const button = document.createElement('button');
+    button.className = 'event';
+    button.type = 'button';
+    button.title = event.title;
+    button.textContent = `${event.allDay ? '' : `${timeFormatter.format(new Date(event.start))} `}${event.title}`;
+    button.addEventListener('click', eventClick => {
+      eventClick.stopPropagation();
+      openEventDialog(event);
+    });
+    return button;
+  }
+
+  function openEventDialog(event = null, selectedDate = null) {
+    form.reset();
+    $('formError').textContent = '';
+    $('eventId').value = event ? event.id : '';
+    $('dialogTitle').textContent = event ? 'Редактировать событие' : 'Новое событие';
+    $('deleteEventButton').hidden = !event;
+
+    const start = event ? new Date(event.start) : defaultStart(selectedDate);
+    const end = event ? new Date(event.end) : new Date(start.getTime() + 60 * 60 * 1000);
+
+    $('eventTitle').value = event ? event.title : '';
+    $('eventStart').value = toLocalInput(start);
+    $('eventEnd').value = toLocalInput(end);
+    $('eventLocation').value = event ? event.location : '';
+    $('eventDescription').value = event ? event.description : '';
+    $('eventAllDay').checked = Boolean(event && event.allDay);
+    toggleAllDay();
+    dialog.showModal();
+    $('eventTitle').focus();
+  }
+
+  function defaultStart(date) {
+    const value = date ? new Date(date) : new Date();
+    value.setHours(9, 0, 0, 0);
+    return value;
+  }
+
+  function toggleAllDay() {
+    const allDay = $('eventAllDay').checked;
+    $('eventEnd').disabled = allDay;
+    $('eventEnd').required = !allDay;
+  }
+
+  function saveEvent(event) {
+    event.preventDefault();
+
+    const allDay = $('eventAllDay').checked;
+    const start = new Date($('eventStart').value);
+    const end = allDay ? new Date(start) : new Date($('eventEnd').value);
+    const payload = {
+      id: $('eventId').value,
+      title: $('eventTitle').value.trim(),
+      start: start.toISOString(),
+      end: end.toISOString(),
+      allDay,
+      location: $('eventLocation').value.trim(),
+      description: $('eventDescription').value.trim()
+    };
+
+    if (!payload.title) {
+      showFormError('Введите название события.');
+      return;
+    }
+
+    if (!payload.allDay && new Date(payload.start) >= new Date(payload.end)) {
+      showFormError('Окончание должно быть позже начала.');
+      return;
+    }
+
+    setLoading(true);
+    const request = payload.id ? 'updateEvent' : 'createEvent';
+
+    google.script.run
+      .withSuccessHandler(() => {
+        closeDialog();
+        loadEvents();
+      })
+      .withFailureHandler(showError)[request](payload);
+  }
+
+  function removeEvent() {
+    const id = $('eventId').value;
+    if (!id || !confirm('Удалить это событие?')) return;
+
+    setLoading(true);
+    google.script.run
+      .withSuccessHandler(() => {
+        closeDialog();
+        loadEvents();
+      })
+      .withFailureHandler(showError)
+      .deleteEvent(id);
+  }
+
+  function closeDialog() {
+    dialog.close();
+  }
+
+  function showFormError(message) {
+    $('formError').textContent = message;
+  }
+
+  function showError(error) {
+    setLoading(false);
+    showFormError(error.message || 'Не удалось выполнить операцию.');
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function setLoading(value) {
+    loading.hidden = !value;
+  }
+
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  function toLocalInput(date) {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date - offset).toISOString().slice(0, 16);
+  }
+</script>
