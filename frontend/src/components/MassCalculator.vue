@@ -225,8 +225,6 @@ const resultText = computed(() => {
   margin-bottom: 6px;
 }
 
-/* Ключевой фикс: строка не переносится и не сжимается в столбик —
-   input и select всегда в один ряд, даже на узких экранах телефона. */
 .mc-inline {
   display: flex !important;
   flex-direction: row !important;
@@ -267,6 +265,23 @@ const resultText = computed(() => {
   font-size: 0.85rem;
 }
 
+/* ФИКС контраста выпадающего списка: браузер рисует popup select'а
+   поверх страницы своими средствами и почти не наследует тему сайта.
+   Поэтому явно задаём цвет текста и фон именно для option/optgroup —
+   так пункты списка всегда читаемы, независимо от темы приложения. */
+.mc-select-full option,
+.mc-unit option {
+  color: #1a1a1a;
+  background-color: #ffffff;
+}
+
+.mc-select-full optgroup,
+.mc-unit optgroup {
+  color: #555555;
+  background-color: #f3f3f3;
+  font-weight: 600;
+}
+
 .mc-static-unit {
   flex: 0 0 auto;
   opacity: 0.6;
@@ -274,7 +289,6 @@ const resultText = computed(() => {
   white-space: nowrap;
 }
 
-/* Результат — крупно и заметно */
 .mc-result {
   margin-top: 8px;
   padding: 16px;
@@ -315,7 +329,6 @@ const resultText = computed(() => {
   opacity: 0.85;
 }
 
-/* Десктоп: больше воздуха, крупнее шрифты */
 @media (min-width: 768px) {
   .mc-card {
     max-width: 560px;
@@ -341,7 +354,6 @@ const resultText = computed(() => {
   }
 }
 
-/* Очень узкий экран — чуть компактнее, но всё ещё в одну строку */
 @media (max-width: 360px) {
   .mc-unit {
     font-size: 0.78rem;
