@@ -2243,6 +2243,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             <div class="experiments-tabs">
               <button class="experiments-tab" :class="{ active: activeExperimentTab === 'alamar' }" @click="activeExperimentTab = 'alamar'">🔬 {{ t('alamarBlue') }}</button>
               <button class="experiments-tab" :class="{ active: activeExperimentTab === 'release' }" @click="activeExperimentTab = 'release'">⚗️ {{ t('release') }}</button>
+              <button class="experiments-tab" :class="{ active: activeExperimentTab === 'calc' }" @click="activeExperimentTab = 'calc'">🧮 Расчёт навески</button>
               <button class="experiments-tab" :class="{ active: activeExperimentTab === 'dls' }" @click="activeExperimentTab = 'dls'" disabled>💧 {{ t('dls') }}</button>
             </div>
 
@@ -2250,8 +2251,6 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <div class="section-title">{{ t('alamarBlue') }}</div>
               <div class="experiment-hint">Загрузите Excel-файл с сырыми данными планшета (570 нм и 600 нм). Система рассчитает жизнеспособность клеток.</div>
               
-              <MassCalculator />
-
             <div class="form-row" style="margin-top:1rem">
               <input type="file" accept=".xlsx,.xls" @change="onAlamarFileChange" />
             </div>
@@ -2364,7 +2363,9 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
                 </div>
               </div>
             </div>
-
+            <div v-else-if="activeExperimentTab === 'calc'" class="experiment-card">
+              <MassCalculator />
+            </div>
             <div v-else class="experiment-card muted">{{ t('dls') }} — {{ language === 'ru' ? 'в разработке' : 'coming soon' }}</div>
           </section>
 
