@@ -1,8 +1,8 @@
 <template>
-  <div class="mass-calculator">
-    <h3>Расчёт по формуле m = C × V × M</h3>
+  <div class="mass-calc-block">
+    <div class="group-title">Расчёт по формуле m = C × V × M</div>
 
-    <div class="calc-row">
+    <div class="form-row">
       <label>Что нужно найти?</label>
       <select v-model="target">
         <option value="mass">Массу (m) — навеска</option>
@@ -12,56 +12,60 @@
       </select>
     </div>
 
-    <hr />
-
-    <!-- Масса (m): всегда либо вход, либо результат -->
-    <div class="calc-row" v-if="target !== 'mass'">
+    <!-- Масса (m) -->
+    <div class="form-row" v-if="target !== 'mass'">
       <label>Масса навески (m)</label>
-      <input v-model.number="mass" type="number" step="any" placeholder="напр. 30" />
-      <select v-model="massUnit">
-        <option value="g">г</option>
-        <option value="mg">мг</option>
-        <option value="ug">мкг</option>
-      </select>
+      <div class="mass-calc-inline">
+        <input v-model.number="mass" type="number" step="any" placeholder="напр. 30" />
+        <select v-model="massUnit">
+          <option value="g">г</option>
+          <option value="mg">мг</option>
+          <option value="ug">мкг</option>
+        </select>
+      </div>
     </div>
 
     <!-- Концентрация (C) -->
-    <div class="calc-row" v-if="target !== 'conc'">
+    <div class="form-row" v-if="target !== 'conc'">
       <label>Концентрация (C)</label>
-      <input v-model.number="concentration" type="number" step="any" placeholder="напр. 10" />
-      <select v-model="concUnit">
-        <option value="M">моль/л (M)</option>
-        <option value="mM">ммоль/л (мМ)</option>
-        <option value="uM">мкмоль/л (мкМ)</option>
-      </select>
+      <div class="mass-calc-inline">
+        <input v-model.number="concentration" type="number" step="any" placeholder="напр. 10" />
+        <select v-model="concUnit">
+          <option value="M">моль/л (M)</option>
+          <option value="mM">ммоль/л (мМ)</option>
+          <option value="uM">мкмоль/л (мкМ)</option>
+        </select>
+      </div>
     </div>
 
     <!-- Объём (V) -->
-    <div class="calc-row" v-if="target !== 'vol'">
+    <div class="form-row" v-if="target !== 'vol'">
       <label>Объём (V)</label>
-      <input v-model.number="volume" type="number" step="any" placeholder="напр. 100" />
-      <select v-model="volUnit">
-        <option value="L">л</option>
-        <option value="mL">мл</option>
-        <option value="uL">мкл</option>
-      </select>
+      <div class="mass-calc-inline">
+        <input v-model.number="volume" type="number" step="any" placeholder="напр. 100" />
+        <select v-model="volUnit">
+          <option value="L">л</option>
+          <option value="mL">мл</option>
+          <option value="uL">мкл</option>
+        </select>
+      </div>
     </div>
 
     <!-- Молярная масса (M) -->
-    <div class="calc-row" v-if="target !== 'molar'">
+    <div class="form-row" v-if="target !== 'molar'">
       <label>Молярная масса (M)</label>
-      <input v-model.number="molarMass" type="number" step="any" placeholder="г/моль" />
-      <span class="unit-static">г/моль</span>
+      <div class="mass-calc-inline">
+        <input v-model.number="molarMass" type="number" step="any" placeholder="г/моль" />
+        <span class="muted">г/моль</span>
+      </div>
     </div>
 
-    <div class="calc-result" v-if="resultText">
-      <p><strong>Результат ({{ targetLabel }}):</strong> {{ resultText }}</p>
-      <p class="calc-hint">
-        Формула: {{ formulaHint }}
-      </p>
+    <div class="formula-block" v-if="resultText">
+      <div><strong>Результат ({{ targetLabel }}):</strong> {{ resultText }}</div>
+      <div class="muted">Формула: {{ formulaHint }}</div>
     </div>
 
-    <div class="calc-warning" v-else-if="hasAllInputs === false">
+    <div class="form-error" v-else-if="hasAllInputs === false">
       Заполните все известные поля, чтобы получить результат.
     </div>
   </div>
@@ -103,7 +107,6 @@ const formulaHint = computed(() => ({
   molar: 'M = m / (C × V)',
 }[target.value]))
 
-// Проверка, что все нужные поля заполнены (кроме искомого)
 const hasAllInputs = computed(() => {
   if (target.value === 'mass') return !!concentration.value && !!volume.value && !!molarMass.value
   if (target.value === 'conc') return !!mass.value && !!volume.value && !!molarMass.value
@@ -140,17 +143,14 @@ const resultText = computed(() => {
     return formatMass(g)
   }
   if (target.value === 'conc') {
-    // C = m / (V * M), результат в моль/л
     const molPerL = mGrams.value / (vLiters.value * mMolar.value)
     return formatConc(molPerL)
   }
   if (target.value === 'vol') {
-    // V = m / (C * M), результат в литрах
     const liters = mGrams.value / (cMolPerL.value * mMolar.value)
     return formatVol(liters)
   }
   if (target.value === 'molar') {
-    // M = m / (C * V), результат в г/моль
     const gPerMol = mGrams.value / (cMolPerL.value * vLiters.value)
     return `${gPerMol.toFixed(3)} г/моль`
   }
@@ -159,48 +159,21 @@ const resultText = computed(() => {
 </script>
 
 <style scoped>
-.mass-calculator {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 16px;
-  margin-top: 12px;
-  background: #fff;
+/*
+  Никаких собственных цветов/фонов — компонент наследует тему
+  через классы приложения: group-title, form-row, muted,
+  formula-block, form-error. Здесь только layout-правки.
+*/
+.mass-calc-block {
+  margin-top: 1rem;
 }
-.calc-row {
+.mass-calc-inline {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
-.calc-row label {
-  min-width: 170px;
-}
-.calc-row input {
-  width: 110px;
-  padding: 4px 6px;
-}
-.calc-row select {
-  padding: 4px 6px;
-}
-.unit-static {
-  color: #666;
-}
-.calc-result {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #f0f7f0;
-  border-radius: 6px;
-}
-.calc-warning {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #fff6e5;
-  border-radius: 6px;
-  color: #8a6d3b;
-}
-.calc-hint {
-  font-size: 0.85em;
-  color: #777;
-  margin-top: 4px;
+.mass-calc-inline input {
+  width: 120px;
 }
 </style>
