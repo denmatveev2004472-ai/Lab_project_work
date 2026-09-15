@@ -2249,6 +2249,13 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
             <div v-if="activeExperimentTab === 'alamar'" class="experiment-card">
               <div class="section-title">{{ t('alamarBlue') }}</div>
               <div class="experiment-hint">Загрузите Excel-файл с сырыми данными планшета (570 нм и 600 нм). Система рассчитает жизнеспособность клеток.</div>
+              
+              <MassCalculator />
+
+            <div class="form-row" style="margin-top:1rem">
+              <input type="file" accept=".xlsx,.xls" @change="onAlamarFileChange" />
+            </div>
+
               <div class="form-row" style="margin-top:1rem">
                 <input type="file" accept=".xlsx,.xls" @change="onAlamarFileChange" />
               </div>
