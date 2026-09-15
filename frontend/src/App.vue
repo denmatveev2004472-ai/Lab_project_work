@@ -1,6 +1,7 @@
 <!-- App.vue — Лаборатория нано- и микрокапсулирования -->
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
+import MassCalculator from './components/MassCalculator.vue'
 
 const API_BASE = import.meta.env.DEV
   ? `${window.location.protocol}//${window.location.hostname}:8000`
@@ -198,7 +199,7 @@ const i18n = {
     instrConfocal: 'Конфокальный микроскоп',
     instrBeNano: 'Динамическое светорассеяние (BeNano)',
     instrLyophil: 'Лиофильная сушка',
-    instrVacuum: 'Вакууматор',
+    instrVacuum: 'Вакуумный сушильный шкаф',
     noBookings: 'Записей нет — нажмите «Забронировать»',
     bookingYou: 'Вы',
     dur30: '30 мин',
@@ -390,7 +391,7 @@ const i18n = {
     instrConfocal: 'Confocal Microscope',
     instrBeNano: 'Dynamic Light Scattering (BeNano)',
     instrLyophil: 'Freeze Dryer (Lyophilizer)',
-    instrVacuum: 'Vacuum Sealer',
+    instrVacuum: 'Vacuum drying oven',
     noBookings: 'No bookings yet — click "Book"',
     bookingYou: 'You',
     dur30: '30 min',
@@ -1055,7 +1056,7 @@ const INSTRUMENTS = [
   { id: 'confocal', labelKey: 'instrConfocal', icon: '🔭', searchNames: ['конфокальный', 'confocal'] },
   { id: 'benano',   labelKey: 'instrBeNano',   icon: '⚗️', searchNames: ['BeNano', 'zeta'] },
   { id: 'lyophil',  labelKey: 'instrLyophil',  icon: '❄️', searchNames: ['Лиофильная', 'лиофил', 'lyophil', 'freeze dry'] },
-  { id: 'vacuum',   labelKey: 'instrVacuum',   icon: '💨', searchNames: ['Вакууматор', 'вакуум', 'vacuum sealer'] },
+  { id: 'vacuum',   labelKey: 'instrVacuum',   icon: '💨', searchNames: ['Вакуумный сушильный шкаф', 'вакуум', 'Vacuum drying oven'] },
 ]
 
 const DURATIONS = [
