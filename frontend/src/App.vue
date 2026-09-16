@@ -2,6 +2,9 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, watch, computed } from 'vue'
 import MassCalculator from './components/MassCalculator.vue'
+import AlamarExperiment from './components/AlamarExperiment.vue'
+import ReleaseExperiment from './components/ReleaseExperiment.vue'
+import DlsPlaceholder from './components/DlsPlaceholder.vue'
 
 const API_BASE = import.meta.env.DEV
   ? `${window.location.protocol}//${window.location.hostname}:8000`
