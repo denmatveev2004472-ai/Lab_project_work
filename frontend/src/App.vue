@@ -2250,126 +2250,32 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               <button class="experiments-tab" :class="{ active: activeExperimentTab === 'dls' }" @click="activeExperimentTab = 'dls'" disabled>💧 {{ t('dls') }}</button>
             </div>
 
-            <div v-if="activeExperimentTab === 'alamar'" class="experiment-card">
-              <div class="section-title">{{ t('alamarBlue') }}</div>
-              <div class="experiment-hint">Загрузите Excel-файл с сырыми данными планшета (570 нм и 600 нм). Система рассчитает жизнеспособность клеток.</div>
-              
-            <div class="form-row" style="margin-top:1rem">
-              <input type="file" accept=".xlsx,.xls" @change="onAlamarFileChange" />
-            </div>
-
-              <div class="form-row" style="margin-top:1rem">
-                <input type="file" accept=".xlsx,.xls" @change="onAlamarFileChange" />
-              </div>
-              <div class="experiment-actions">
-                <button class="btn btn-primary" :disabled="experimentLoading || !alamarFile" @click="processAlamar">
-                  {{ experimentLoading ? t('processing') : t('process') }}
-                </button>
-                <button v-if="alamarResult" class="btn" @click="downloadAlamarExcel">📊 {{ t('downloadExcel') }}</button>
-              </div>
-              <div v-if="experimentError" class="form-error">{{ experimentError }}</div>
-
-              <div v-if="alamarResult && alamarResult.samples" class="experiment-results">
-                <div class="group-title">{{ t('results') }}</div>
-                <div class="results-table-wrap">
-                  <table class="results-table">
-                    <thead>
-                      <tr><th>{{ t('sample') }}</th><th>{{ t('mean') }} (+ctrl)</th><th>{{ t('std') }}</th><th>{{ t('mean') }} (-ctrl)</th><th>{{ t('std') }}</th><th>n</th></tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="s in alamarResult.samples" :key="s.name">
-                        <td><strong>{{ s.name }}</strong></td>
-                        <td>{{ s.mean_positive_control }}</td>
-                        <td>{{ s.std_positive_control }}</td>
-                        <td>{{ s.mean_negative_control ?? '—' }}</td>
-                        <td>{{ s.std_negative_control ?? '—' }}</td>
-                        <td>{{ s.n }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <!-- Simple bar chart -->
-                <div class="chart-block">
-                  <div class="chart-title">{{ t('viability') }}</div>
-                  <div class="chart-bars">
-                    <div v-for="s in alamarResult.samples" :key="s.name" class="chart-bar-row">
-                      <span class="chart-label">{{ s.name }}</span>
-                      <div class="chart-bar-track">
-                        <div class="chart-bar-fill" :style="{ width: Math.min(s.mean_positive_control, 100) + '%' }"></div>
-                      </div>
-                      <span class="chart-value">{{ s.mean_positive_control }}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="formula-block">
-                  <div class="muted">{{ alamarResult.formula_corrected }}</div>
-                  <div class="muted">{{ alamarResult.formula_positive }}</div>
-                  <div class="muted">{{ alamarResult.formula_negative }}</div>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="activeExperimentTab === 'release'" class="experiment-card">
-              <div class="section-title">{{ t('release') }}</div>
-              <div class="experiment-hint">Загрузите Excel-файл с данными загрузки и релиза. Система рассчитает эффективность загрузки и профиль высвобождения.</div>
-              <div class="form-row" style="margin-top:1rem">
-                <input type="file" accept=".xlsx,.xls" @change="onReleaseFileChange" />
-              </div>
-              <div class="experiment-actions">
-                <button class="btn btn-primary" :disabled="experimentLoading || !releaseFile" @click="processRelease">
-                  {{ experimentLoading ? t('processing') : t('process') }}
-                </button>
-                <button v-if="releaseResult" class="btn" @click="downloadReleaseExcel">📊 {{ t('downloadExcel') }}</button>
-              </div>
-              <div v-if="experimentError" class="form-error">{{ experimentError }}</div>
-
-              <div v-if="releaseResult && releaseResult.loading" class="experiment-results">
-                <div class="group-title">{{ t('loadingBlock') }}</div>
-                <div class="results-grid">
-                  <div class="result-kv"><span class="result-k">{{ t('encapsulationEff') }}</span><span class="result-v">{{ releaseResult.loading.percent_loaded ?? '—' }} %</span></div>
-                  <div class="result-kv"><span class="result-k">Запакованная масса</span><span class="result-v">{{ releaseResult.loading.encapsulated_mass_mg ?? '—' }} мг</span></div>
-                </div>
-
-                <div v-for="(profile, pIdx) in releaseResult.release_profiles" :key="pIdx" class="release-profile-block">
-                  <div class="group-title">{{ t('releaseProfile') }} — {{ profile.solvent || '—' }}</div>
-                  <div class="results-table-wrap">
-                    <table class="results-table">
-                      <thead>
-                        <tr><th>{{ t('timeH') }}</th><th>OD mean</th><th>Конц. мг/мл</th><th>Масса мг</th><th>% в растворе</th><th>% осталось</th><th>% релиза</th></tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="row in profile.rows" :key="row.time">
-                          <td>{{ row.time }}</td>
-                          <td>{{ row.od_mean ?? '—' }}</td>
-                          <td>{{ row.concentration_mg_ml ?? '—' }}</td>
-                          <td>{{ row.mass_mg ?? '—' }}</td>
-                          <td>{{ row.percent_in_solution ?? '—' }}</td>
-                          <td>{{ row.percent_remaining ?? '—' }}</td>
-                          <td><strong>{{ row.percent_release ?? '—' }}</strong></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <!-- Release chart -->
-                  <div class="chart-block">
-                    <div class="chart-title">{{ t('cumulativeRelease') }}</div>
-                    <div class="chart-bars">
-                      <div v-for="row in profile.rows" :key="row.time" class="chart-bar-row">
-                        <span class="chart-label">{{ row.time }}</span>
-                        <div class="chart-bar-track">
-                          <div class="chart-bar-fill release-fill" :style="{ width: Math.min(row.percent_release || 0, 100) + '%' }"></div>
-                        </div>
-                        <span class="chart-value">{{ row.percent_release ?? '—' }}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <AlamarExperiment
+              v-if="activeExperimentTab === 'alamar'"
+              :t="t"
+              :loading="experimentLoading"
+              :error="experimentError"
+              :has-file="!!alamarFile"
+              :result="alamarResult"
+              @file-change="onAlamarFileChange"
+              @process="processAlamar"
+              @download="downloadAlamarExcel"
+            />
+            <ReleaseExperiment
+              v-else-if="activeExperimentTab === 'release'"
+              :t="t"
+              :loading="experimentLoading"
+              :error="experimentError"
+              :has-file="!!releaseFile"
+              :result="releaseResult"
+              @file-change="onReleaseFileChange"
+              @process="processRelease"
+              @download="downloadReleaseExcel"
+            />
             <div v-else-if="activeExperimentTab === 'calc'" class="experiment-card">
               <MassCalculator />
             </div>
-            <div v-else class="experiment-card muted">{{ t('dls') }} — {{ language === 'ru' ? 'в разработке' : 'coming soon' }}</div>
+            <DlsPlaceholder v-else :t="t" :language="language" />
           </section>
 
           <!-- ═══ TABLE CARD (reagents, equipment, consumables) ═══ -->
