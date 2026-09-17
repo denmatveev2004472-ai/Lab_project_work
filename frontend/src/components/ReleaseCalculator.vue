@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import DilutionCalculator from './DilutionCalculator.vue'
 
 const API_BASE = import.meta.env.DEV
   ? `${window.location.protocol}//${window.location.hostname}:8000`
@@ -100,27 +101,6 @@ function calibrationChart(curve) {
   return { pts: screenPts, line, W, H, xLabel: `${fmt(xMin, 2)} … ${fmt(xMax, 2)}`, yLabel: `${fmt(yMin, 2)} … ${fmt(yMax, 2)}` }
 }
 
-// ─── Разведение: два метода расчёта кратности ───────────────────────────────
-const dilutionHelper = reactive({
-  mode: 'ratio', // 'ratio' | 'volume'
-  ratioSample: 1,
-  ratioDiluent: 1,
-  aliquot: 20,
-  totalVolume: 1000
-})
-const dilutionHelperResult = computed(() => {
-  if (dilutionHelper.mode === 'ratio') {
-    const a = Number(dilutionHelper.ratioSample) || 0
-    const d = Number(dilutionHelper.ratioDiluent) || 0
-    if (a <= 0) return null
-    return (a + d) / a
-  }
-  const al = Number(dilutionHelper.aliquot) || 0
-  const tot = Number(dilutionHelper.totalVolume) || 0
-  if (al <= 0) return null
-  return tot / al
-})
-
 // ─── Образцы (несколько одновременно) ────────────────────────────────────────
 const samples = ref([
   {
@@ -220,6 +200,32 @@ const combinedChart = computed(() => {
   }))
   return { series: withPaths, W, H, xMax, yMax }
 })
+
+// ─── Вспомогательный калькулятор разведения ─────────────────────────────────
+// Открывается по кнопке "Рассчитать" рядом с конкретной строкой конкретного
+// образца. Результат переносится ТОЛЬКО в эту строку по явному действию —
+// ничего не считается автоматически и не путается с другими образцами.
+const showDilutionCalc = ref(false)
+const activeDilutionRow = ref(null) // { sample, row, sampleLabel, timeLabel }
+
+function openDilutionCalc(sample, row, sIdx, rIdx) {
+  activeDilutionRow.value = {
+    sample, row,
+    sampleLabel: sample.name || `Образец ${sIdx + 1}`,
+    timeLabel: row.time !== '' && row.time !== null ? `${row.time} ч` : `строка ${rIdx + 1}`
+  }
+  showDilutionCalc.value = true
+}
+function closeDilutionCalc() {
+  showDilutionCalc.value = false
+  activeDilutionRow.value = null
+}
+function applyDilutionResult(value) {
+  if (activeDilutionRow.value) {
+    activeDilutionRow.value.row.dilution = value
+  }
+  closeDilutionCalc()
+}
 
 // ─── Экспорт ─────────────────────────────────────────────────────────────────
 const exporting = ref(false)
@@ -382,45 +388,6 @@ function exportFullCsv() {
       </div>
     </div>
 
-    <!-- ═══ ПОМОЩНИК РАЗВЕДЕНИЯ ═══ -->
-    <div class="rc-section rc-dilution-helper">
-      <div class="group-title">Калькулятор разведения — узнайте кратность (×), прежде чем вписывать её в таблицу образца</div>
-      <div class="rc-dilution-modes">
-        <button class="btn btn-tiny" :class="{ active: dilutionHelper.mode === 'ratio' }" @click="dilutionHelper.mode = 'ratio'">По частям (X : Y)</button>
-        <button class="btn btn-tiny" :class="{ active: dilutionHelper.mode === 'volume' }" @click="dilutionHelper.mode = 'volume'">По объёму (аликвота → итог)</button>
-      </div>
-
-      <div v-if="dilutionHelper.mode === 'ratio'" class="rc-dilution-body">
-        <div class="rc-dilution-inputs">
-          <div class="form-row"><label>Частей образца</label><input v-model="dilutionHelper.ratioSample" type="number" step="any" /></div>
-          <span class="rc-colon">:</span>
-          <div class="form-row"><label>Частей растворителя</label><input v-model="dilutionHelper.ratioDiluent" type="number" step="any" /></div>
-        </div>
-        <div class="rc-dilution-hint">
-          ⚠️ Частая ошибка: запись «1:1» — это <strong>не</strong> разведение ×1. Смешали 1 часть образца + 1 часть растворителя →
-          итоговый объём стал в 2 раза больше исходного, значит разведение ×2.
-          Формула: (части образца + части растворителя) / части образца.
-        </div>
-      </div>
-      <div v-else class="rc-dilution-body">
-        <div class="rc-dilution-inputs">
-          <div class="form-row"><label>Объём аликвоты, мкл</label><input v-model="dilutionHelper.aliquot" type="number" step="any" /></div>
-          <span class="rc-colon">→</span>
-          <div class="form-row"><label>Итоговый объём, мкл</label><input v-model="dilutionHelper.totalVolume" type="number" step="any" /></div>
-        </div>
-        <div class="rc-dilution-hint">
-          Пример: взяли 20 мкл раствора и довели буфером до 1000 мкл → разведение = 1000 / 20 = <strong>×50</strong>.
-          Формула: итоговый объём / объём взятой аликвоты.
-        </div>
-      </div>
-
-      <div class="rc-dilution-result">
-        Кратность разведения:
-        <strong>{{ dilutionHelperResult !== null ? '×' + fmt(dilutionHelperResult, 2) : '—' }}</strong>
-        <span class="muted"> — впишите это число в поле «Разведение (×)» нужной строки образца ниже.</span>
-      </div>
-    </div>
-
     <!-- ═══ ОБРАЗЦЫ ═══ -->
     <div class="rc-section">
       <div class="rc-section-header">
@@ -428,13 +395,14 @@ function exportFullCsv() {
         <button class="btn btn-tiny" @click="addSample">+ Добавить образец</button>
       </div>
 
-      <div v-for="(sw, sIdx) in samplesWithResults" :key="sw.sample.id" class="rc-card" :style="{ borderLeft: '4px solid ' + palette[sIdx % palette.length] }">
+      <div v-for="(sw, sIdx) in samplesWithResults" :key="sw.sample.id" class="rc-card">
         <div class="rc-card-top">
           <input v-model="sw.sample.name" type="text" placeholder="Название образца, например: Ca-CO3 НЧ" class="rc-name-input" />
           <select v-model="sw.sample.curveId" class="rc-small-input">
             <option value="" disabled>Калибровка</option>
             <option v-for="c in curves" :key="c.id" :value="c.id">{{ c.name || 'Без названия' }}</option>
           </select>
+          <span class="rc-sample-dot" :style="{ background: palette[sIdx % palette.length] }" aria-hidden="true"></span>
           <button v-if="samples.length > 1" class="icon-btn" title="Удалить образец" @click="removeSample(sw.sample.id)">🗑️</button>
         </div>
 
@@ -458,7 +426,15 @@ function exportFullCsv() {
             <input v-model="row.od1" type="number" step="any" placeholder="0.335" />
             <input v-model="row.od2" type="number" step="any" placeholder="0.336" />
             <input v-model="row.od3" type="number" step="any" placeholder="0.333" />
-            <input v-model="row.dilution" type="number" step="any" placeholder="1" />
+            <div class="rc-dilution-cell">
+              <input v-model="row.dilution" type="number" step="any" placeholder="1" />
+              <button
+                type="button"
+                class="rc-dilution-calc-btn"
+                title="Рассчитать кратность разведения для этой строки"
+                @click="openDilutionCalc(sw.sample, row, sIdx, rIdx)"
+              >Рассчитать</button>
+            </div>
             <button v-if="sw.sample.rows.length > 1" class="icon-btn" @click="removeRow(sw.sample, rIdx)">✕</button>
           </div>
           <button class="btn btn-tiny" @click="addRow(sw.sample)">+ Точка времени</button>
@@ -525,6 +501,14 @@ function exportFullCsv() {
       <button class="btn" @click="exportFullCsv">📄 Скачать CSV (все данные: калибровки + образцы)</button>
     </div>
     <div v-if="exportError" class="form-error">{{ exportError }}</div>
+
+    <!-- ═══ ВСПОМОГАТЕЛЬНЫЙ КАЛЬКУЛЯТОР РАЗВЕДЕНИЯ (модально, не смешан с формой) ═══ -->
+    <DilutionCalculator
+      v-if="showDilutionCalc"
+      :key="activeDilutionRow ? activeDilutionRow.sample.id + '-' + activeDilutionRow.timeLabel : 'dilution'"
+      @apply="applyDilutionResult"
+      @close="closeDilutionCalc"
+    />
   </div>
 </template>
 
@@ -542,6 +526,7 @@ function exportFullCsv() {
 .rc-card-top { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
 .rc-name-input { flex: 1 1 220px; min-width: 160px; padding: .6rem .8rem; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
 .rc-small-input { padding: .6rem .7rem; border-radius: var(--radius-md); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); width: 110px; }
+.rc-sample-dot { width: 10px; height: 10px; border-radius: var(--radius-full); flex: 0 0 auto; }
 .rc-checkbox-row { display: flex; align-items: center; gap: .5rem; font-size: var(--text-sm); color: var(--color-text-muted); }
 .rc-kb-manual { display: flex; gap: 1rem; flex-wrap: wrap; }
 .rc-points-table { display: grid; gap: .4rem; }
@@ -556,22 +541,28 @@ function exportFullCsv() {
 .rc-line { stroke: var(--color-primary); stroke-width: 2; fill: none; }
 .rc-point { fill: var(--color-primary-2); }
 .rc-chart-caption { font-size: var(--text-xs); color: var(--color-text-muted); }
-.rc-dilution-helper { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); }
-.rc-dilution-modes { display: flex; gap: .5rem; flex-wrap: wrap; }
-.rc-dilution-modes .btn.active { background: linear-gradient(135deg, var(--color-primary), var(--color-primary-2)); color: white; border-color: transparent; }
-.rc-dilution-body { display: grid; gap: .6rem; margin-top: .5rem; }
-.rc-dilution-inputs { display: flex; align-items: flex-end; gap: .6rem; flex-wrap: wrap; }
-.rc-colon { font-size: 1.2rem; font-weight: 700; color: var(--color-text-muted); padding-bottom: .6rem; }
-.rc-dilution-hint { font-size: var(--text-sm); color: var(--color-text-muted); background: var(--color-surface-2); border-left: 3px solid var(--color-warning); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: var(--space-3); }
-.rc-dilution-result { font-size: var(--text-sm); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); }
 .rc-rows-table { display: grid; gap: .4rem; }
-.rc-rows-header, .rc-rows-row { display: grid; grid-template-columns: 5rem 5rem 5rem 5rem 6rem 2rem; gap: .4rem; align-items: center; }
+.rc-rows-header, .rc-rows-row { display: grid; grid-template-columns: 5rem 5rem 5rem 5rem 9rem 2rem; gap: .4rem; align-items: center; }
 .rc-rows-header { font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; }
 .rc-rows-row input { padding: .5rem .5rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); width: 100%; }
+.rc-dilution-cell { display: flex; gap: .3rem; align-items: center; }
+.rc-dilution-cell input { flex: 1 1 3.5rem; min-width: 3rem; }
+.rc-dilution-calc-btn {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  padding: .4rem .6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rc-dilution-calc-btn:hover { background: var(--color-primary-highlight); }
 .rc-legend { display: flex; gap: 1rem; flex-wrap: wrap; }
 .rc-legend-item { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--text-sm); }
 .rc-legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
 @media (max-width: 700px) {
-  .rc-rows-header, .rc-rows-row { grid-template-columns: repeat(5, 1fr) 1.5rem; font-size: .8rem; }
+  .rc-rows-header, .rc-rows-row { grid-template-columns: repeat(4, 1fr) 8rem 1.5rem; font-size: .8rem; }
 }
 </style>
