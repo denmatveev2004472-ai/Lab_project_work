@@ -2261,17 +2261,7 @@ watch(anyModalOpen, (val) => { document.body.classList.toggle('modal-open', val)
               @process="processAlamar"
               @download="downloadAlamarExcel"
             />
-            <ReleaseExperiment
-              v-else-if="activeExperimentTab === 'release'"
-              :t="t"
-              :loading="experimentLoading"
-              :error="experimentError"
-              :has-file="!!releaseFile"
-              :result="releaseResult"
-              @file-change="onReleaseFileChange"
-              @process="processRelease"
-              @download="downloadReleaseExcel"
-            />
+            <ReleaseCalculator v-else-if="activeExperimentTab === 'release'" />
             <div v-else-if="activeExperimentTab === 'calc'" class="experiment-card">
               <MassCalculator />
             </div>
